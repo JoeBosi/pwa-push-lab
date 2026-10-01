@@ -1,0 +1,46 @@
+{
+  "id": "/",
+  "name": "Notizie — prova notifiche push",
+  "short_name": "Notizie",
+  "description": "Sito di prova per test delle notifiche push per applicazioni PWA: notizie per categoria, con la frequenza scelta da ogni utente.",
+  "start_url": "/?fonte=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "lang": "it",
+  "dir": "ltr",
+  "categories": [
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/icone/icona-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icone/icona-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icone/icona-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "prefer_related_applications": false
+}

@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App ↔ server: il sistema di comunicazione, minimo e funzionante</title>
+<meta name="description" content="Come far parlare una PWA con il suo server per le notifiche push: quattro rotte, quattro pezzi di codice, in ordine. Copiabile così com'è.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f5f7fc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icone/icona-192.png" type="image/png">
+<link rel="stylesheet" href="/architettura.css">
+</head>
+<body>
+<a class="salta" href="#principale">Salta al contenuto</a>
+
+<div class="guscio">
+
+<header class="testata">
+  <p class="briciole">Istruzioni · pwa.example.com</p>
+  <h1>App ↔ server:<br>il sistema di comunicazione</h1>
+  <p class="sommario">
+    Il minimo che serve perché una PWA e il suo server si parlino per le notifiche
+    push. <strong>Quattro rotte, quattro pezzi di codice, in ordine.</strong>
+    Nessun framework, nessun servizio terzo, due dipendenze —
+    <code>express</code> e <code>web-push</code>.
+    Tutto quello che c'è qui è in produzione e ha fatto squillare un iPhone.
+  </p>
+  <ul class="meta">
+    <li>~150 righe di server</li>
+    <li>~60 righe di client</li>
+    <li>Nessun database</li>
+    <li>Copiabile così com'è</li>
+  </ul>
+</header>
+
+<nav class="indice" aria-label="Indice">
+  <h2>Indice</h2>
+  <ol>
+    <li><a href="#idea">L'idea in trenta secondi</a></li>
+    <li><a href="#rotte">Le quattro rotte</a></li>
+    <li><a href="#zero">Passo 0 — le chiavi</a></li>
+    <li><a href="#server">Il server, per intero</a></li>
+    <li><a href="#client">Il client, per intero</a></li>
+    <li><a href="#sw">Il service worker</a></li>
+    <li><a href="#prova">Provarlo</a></li>
+    <li><a href="#utenti">Un messaggio per ogni utente</a></li>
+    <li><a href="#oltre">Quando cresce</a></li>
+  </ol>
+</nav>
+
+<main id="principale">
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="idea">
+  <h2><span class="numero">1</span>L'idea in trenta secondi</h2>
+  <p class="occhiello-sez">
+    Il server non parla mai direttamente col telefono. Non potrebbe.
+  </p>
+
+  <p>
+    Un telefono non ha un indirizzo stabile a cui bussare. Il Web Push risolve così:
+    è <strong>il browser</strong> a chiedere a Google o ad Apple una casella postale
+    per quel dispositivo, e a passartene l'indirizzo. Tu lo conservi e, quando hai
+    qualcosa da dire, lo consegni a Google o ad Apple — che ci pensano loro a
+    svegliare il telefono.
+  </p>
+
+  <div class="diagramma">
+    <svg viewBox="0 0 820 340" role="img" aria-label="Diagramma di sequenza in cinque passi. 1: il telefono chiede una casella al servizio push. 2: il servizio push risponde con indirizzo e chiavi. 3: il telefono consegna la casella al tuo server. Tempo dopo, 4: il server consegna il messaggio al servizio push. 5: il servizio push sveglia il telefono, che mostra la notifica.">
+      <defs>
+        <marker id="f" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" class="d-punta"/></marker>
+        <marker id="fok" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" class="d-punta-ok"/></marker>
+      </defs>
+
+      <!-- i tre protagonisti -->
+      <rect x="20" y="14" width="190" height="52" rx="12" class="d-scatola-forte"/>
+      <text x="115" y="37" text-anchor="middle" class="d-testo">Telefono</text>
+      <text x="115" y="54" text-anchor="middle" class="d-piccolo">pagina + service worker</text>
+      <rect x="315" y="14" width="190" height="52" rx="12" class="d-scatola"/>
+      <text x="410" y="37" text-anchor="middle" class="d-testo">Servizio push</text>
+      <text x="410" y="54" text-anchor="middle" class="d-piccolo">FCM (Google) · APNs (Apple)</text>
+      <rect x="610" y="14" width="190" height="52" rx="12" class="d-scatola"/>
+      <text x="705" y="37" text-anchor="middle" class="d-testo">Il tuo server</text>
+      <text x="705" y="54" text-anchor="middle" class="d-piccolo">Node + web-push</text>
+
+      <line x1="115" y1="66" x2="115" y2="326" class="d-vita"/>
+      <line x1="410" y1="66" x2="410" y2="326" class="d-vita"/>
+      <line x1="705" y1="66" x2="705" y2="326" class="d-vita"/>
+
+      <!-- iscrizione: una volta -->
+      <line x1="115" y1="104" x2="402" y2="104" class="d-freccia" marker-end="url(#f)"/>
+      <text x="262" y="96" text-anchor="middle" class="d-etichetta">1 · subscribe() — «dammi una casella»</text>
+      <line x1="410" y1="144" x2="123" y2="144" class="d-freccia" marker-end="url(#f)"/>
+      <text x="262" y="136" text-anchor="middle" class="d-etichetta">2 · la casella: indirizzo + chiavi</text>
+      <line x1="115" y1="184" x2="697" y2="184" class="d-freccia" marker-end="url(#f)"/>
+      <text x="560" y="176" text-anchor="middle" class="d-etichetta">3 · POST /api/iscrivi — la consegna al server</text>
+
+      <line x1="20" y1="216" x2="800" y2="216" class="d-separatore"/>
+      <text x="410" y="236" text-anchor="middle" class="d-corsivo">… minuti, ore o giorni dopo, quando c'è qualcosa da dire …</text>
+
+      <!-- invio: ogni volta -->
+      <line x1="705" y1="268" x2="418" y2="268" class="d-freccia" marker-end="url(#f)"/>
+      <text x="560" y="260" text-anchor="middle" class="d-etichetta">4 · sendNotification() — firmata e cifrata</text>
+      <line x1="410" y1="308" x2="123" y2="308" class="d-freccia-ok" marker-end="url(#fok)"/>
+      <text x="262" y="300" text-anchor="middle" class="d-etichetta">5 · sveglia il telefono → notifica</text>
+    </svg>
+  </div>
+  <p class="didascalia">
+    I passi 1–3 avvengono <strong>una volta</strong>, quando l'utente attiva le
+    notifiche. I passi 4–5 <strong>ogni volta</strong> che c'è da dire qualcosa. Il
+    server non parla mai direttamente col telefono: passa sempre dal servizio push.
+  </p>
+
+  <div class="nota">
+    <span class="capo">Le tre cose che contano</span>
+    <p>
+      <strong>La «casella» è un oggetto JSON</strong> — la <em>subscription</em>: un URL
+      lungo più le due chiavi con cui il contenuto viene cifrato. La conservi tu.
+    </p>
+    <p>
+      <strong>Il contenuto viaggia cifrato</strong> con quelle chiavi: Google e Apple
+      non possono leggerlo. Non devi fare nulla, ci pensa <code>web-push</code>.
+    </p>
+    <p>
+      <strong>Non c'è un canale aperto.</strong> Il telefono non è connesso al tuo
+      server. Dorme, e il sistema operativo lo sveglia quando arriva qualcosa.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="rotte">
+  <h2><span class="numero">2</span>Le quattro rotte</h2>
+  <p class="occhiello-sez">Tutto il protocollo sta qui dentro.</p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Rotta</th><th>Chi la chiama</th><th>Cosa passa</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>GET /api/chiave-pubblica</code></td>
+          <td>la pagina, all'avvio</td>
+          <td>← <code>{ "chiave": "BAwo…" }</code><br>
+            <span class="d-piccolo">la chiave pubblica VAPID, serve a <code>subscribe()</code></span></td>
+        </tr>
+        <tr>
+          <td><code>POST /api/iscrivi</code></td>
+          <td>la pagina, dopo <code>subscribe()</code></td>
+          <td>→ <code>{ "iscrizione": {…} }</code><br>
+            <span class="d-piccolo">la casella postale del dispositivo</span></td>
+        </tr>
+        <tr>
+          <td><code>POST /api/disiscrivi</code></td>
+          <td>la pagina, quando l'utente spegne</td>
+          <td>→ <code>{ "endpoint": "https://…" }</code></td>
+        </tr>
+        <tr>
+          <td><code>POST /api/invia</code></td>
+          <td><strong>te</strong>, o il tuo codice</td>
+          <td>→ <code>{ "titolo": "…", "testo": "…" }</code><br>
+            <span class="d-piccolo">richiede un token: fa squillare tutti</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota pericolo">
+    <span class="capo">L'unica decisione di sicurezza che conta</span>
+    <p>
+      <code>/api/invia</code> fa suonare <strong>ogni</strong> telefono iscritto. Se la
+      lasci aperta, chiunque conosca l'indirizzo può farlo. <strong>Nasce chiusa</strong>:
+      se il token non è configurato, risponde chiusa — non aperta. Le altre tre non
+      hanno bisogno di segreti, perché non fanno nulla di dannoso.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="zero">
+  <h2><span class="numero">3</span>Passo 0 — le chiavi</h2>
+  <p class="occhiello-sez">Si fa una volta sola, e poi non si tocca più.</p>
+
+<pre translate="no"><code>npm install express web-push
+node -e <span class="c-stringa">"const w=require('web-push');const k=w.generateVAPIDKeys();
+console.log('VAPID_PUBLIC_KEY='+k.publicKey);
+console.log('VAPID_PRIVATE_KEY='+k.privateKey)"</span> &gt; .env</code></pre>
+
+  <p>Aggiungi a mano nel <code>.env</code>:</p>
+<pre translate="no"><code>VAPID_SUBJECT=mailto:tua@email.it
+TOKEN_INVIO=una-frase-lunga-a-caso
+PORT=3020</code></pre>
+
+  <div class="nota pericolo">
+    <span class="capo">La chiave privata</span>
+    <p>
+      Firma le notifiche a nome del tuo sito: chi ce l'ha può spedire a tutti i tuoi
+      iscritti. <code>chmod 600</code>, mai nei commit, mai nei log.
+    </p>
+    <p>
+      <strong>Rigenerare la coppia invalida tutte le iscrizioni esistenti</strong>, perché
+      i dispositivi sono legati alla vecchia chiave pubblica: ogni invio fallirebbe
+      con <code>403</code>. Se la rigeneri, svuota anche l'archivio.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="server">
+  <h2><span class="numero">4</span>Il server, per intero</h2>
+  <p class="occhiello-sez">
+    Questo file funziona. Copialo, cambia il nome, sei a posto.
+  </p>
+
+  <p class="titolo-codice">server.js</p>
+<pre translate="no"><code><span class="c-chiave">const</span> fs = <span class="c-chiave">require</span>(<span class="c-stringa">'fs'</span>);
+<span class="c-chiave">const</span> path = <span class="c-chiave">require</span>(<span class="c-stringa">'path'</span>);
+<span class="c-chiave">const</span> express = <span class="c-chiave">require</span>(<span class="c-stringa">'express'</span>);
+<span class="c-chiave">const</span> webpush = <span class="c-chiave">require</span>(<span class="c-stringa">'web-push'</span>);
+
+<span class="c-commento">// Un .env letto a mano: aggiungere "dotenv" per venti righe di parsing non</span>
+<span class="c-commento">// vale una dipendenza in piu' in un progetto che ne ha due.</span>
+<span class="c-chiave">for</span> (<span class="c-chiave">const</span> riga <span class="c-chiave">of</span> fs.<span class="c-chiave">readFileSync</span>(<span class="c-stringa">'.env'</span>, <span class="c-stringa">'utf8'</span>).<span class="c-chiave">split</span>(<span class="c-stringa">'\n'</span>)) {
+  <span class="c-chiave">const</span> m = riga.<span class="c-chiave">match</span>(/^\s*([A-Z_]+)\s*=\s*(.*)\s*$/);
+  <span class="c-chiave">if</span> (m) process.env[m[<span class="c-numero">1</span>]] = m[<span class="c-numero">2</span>];
+}
+
+webpush.<span class="c-chiave">setVapidDetails</span>(
+  process.env.VAPID_SUBJECT,      <span class="c-commento">// mailto: o https: VERI</span>
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
+
+<span class="c-commento">// ─── L'archivio: un file JSON ───────────────────────────────────────────</span>
+<span class="c-commento">// Le iscrizioni di un'app piccola sono decine, non milioni. Un database qui</span>
+<span class="c-commento">// aggiungerebbe un servizio da tenere vivo senza risolvere nulla.</span>
+<span class="c-chiave">const</span> ARCHIVIO = <span class="c-stringa">'./dati/iscrizioni.json'</span>;
+
+<span class="c-chiave">function</span> <span class="c-nome">leggi</span>() {
+  <span class="c-chiave">try</span> { <span class="c-chiave">return</span> <span class="c-nome">JSON</span>.<span class="c-chiave">parse</span>(fs.<span class="c-chiave">readFileSync</span>(ARCHIVIO, <span class="c-stringa">'utf8'</span>)); }
+  <span class="c-chiave">catch</span> (e) { <span class="c-chiave">return</span> []; }   <span class="c-commento">// file assente al primo avvio: e' la normalita'</span>
+}
+
+<span class="c-chiave">function</span> <span class="c-nome">scrivi</span>(elenco) {
+  fs.<span class="c-chiave">mkdirSync</span>(path.<span class="c-chiave">dirname</span>(ARCHIVIO), { recursive: <span class="c-chiave">true</span> });
+  <span class="c-commento">// Scrittura atomica: un'interruzione a meta' lascerebbe un JSON troncato,</span>
+  <span class="c-commento">// e al riavvio si perderebbero TUTTE le iscrizioni invece di una.</span>
+  fs.<span class="c-chiave">writeFileSync</span>(ARCHIVIO + <span class="c-stringa">'.tmp'</span>, <span class="c-nome">JSON</span>.<span class="c-chiave">stringify</span>(elenco, <span class="c-chiave">null</span>, <span class="c-numero">2</span>));
+  fs.<span class="c-chiave">renameSync</span>(ARCHIVIO + <span class="c-stringa">'.tmp'</span>, ARCHIVIO);
+}
+
+<span class="c-commento">// ─── L'applicazione ─────────────────────────────────────────────────────</span>
+<span class="c-chiave">const</span> app = <span class="c-chiave">express</span>();
+app.<span class="c-chiave">use</span>(express.<span class="c-chiave">json</span>({ limit: <span class="c-stringa">'32kb'</span> }));  <span class="c-commento">// i payload sono minuscoli</span>
+app.<span class="c-chiave">use</span>(express.<span class="c-chiave">static</span>(<span class="c-stringa">'public'</span>));
+
+<span class="c-commento">// Il service worker DEVE arrivare dalla radice: il suo raggio d'azione non</span>
+<span class="c-commento">// puo' risalire sopra la cartella da cui e' stato scaricato.</span>
+app.<span class="c-chiave">get</span>(<span class="c-stringa">'/sw.js'</span>, (req, res) => {
+  res.<span class="c-chiave">set</span>({
+    <span class="c-stringa">'Content-Type'</span>: <span class="c-stringa">'application/javascript'</span>,
+    <span class="c-commento">// Senza questo il browser serve per ore un worker vecchio, e una</span>
+    <span class="c-commento">// correzione sembra non avere alcun effetto.</span>
+    <span class="c-stringa">'Cache-Control'</span>: <span class="c-stringa">'no-cache'</span>,
+    <span class="c-stringa">'Service-Worker-Allowed'</span>: <span class="c-stringa">'/'</span>,
+  });
+  res.<span class="c-chiave">sendFile</span>(path.<span class="c-chiave">resolve</span>(<span class="c-stringa">'sw.js'</span>));
+});
+
+<span class="c-commento">// ① La chiave PUBBLICA: e' fatta per essere distribuita. Nessun segreto.</span>
+app.<span class="c-chiave">get</span>(<span class="c-stringa">'/api/chiave-pubblica'</span>, (req, res) => {
+  res.<span class="c-chiave">json</span>({ chiave: process.env.VAPID_PUBLIC_KEY });
+});
+
+<span class="c-commento">// ② Iscrizione. L'endpoint e' la chiave: lo stesso telefono ripresenta lo</span>
+<span class="c-commento">// stesso endpoint, quindi si AGGIORNA, non si duplica.</span>
+app.<span class="c-chiave">post</span>(<span class="c-stringa">'/api/iscrivi'</span>, (req, res) => {
+  <span class="c-chiave">const</span> s = req.body?.iscrizione;
+  <span class="c-chiave">if</span> (!s?.endpoint?.<span class="c-chiave">startsWith</span>(<span class="c-stringa">'https://'</span>) || !s.keys?.p256dh || !s.keys?.auth) {
+    <span class="c-chiave">return</span> res.<span class="c-chiave">status</span>(<span class="c-numero">400</span>).<span class="c-chiave">json</span>({ errore: <span class="c-stringa">'iscrizione incompleta'</span> });
+  }
+  <span class="c-chiave">const</span> elenco = <span class="c-nome">leggi</span>().<span class="c-chiave">filter</span>((x) => x.endpoint !== s.endpoint);
+  elenco.<span class="c-chiave">push</span>({ endpoint: s.endpoint, keys: s.keys, quando: <span class="c-chiave">new</span> <span class="c-nome">Date</span>().<span class="c-chiave">toISOString</span>() });
+  <span class="c-nome">scrivi</span>(elenco);
+  res.<span class="c-chiave">json</span>({ ok: <span class="c-chiave">true</span>, totale: elenco.length });
+});
+
+<span class="c-commento">// ③ Disiscrizione.</span>
+app.<span class="c-chiave">post</span>(<span class="c-stringa">'/api/disiscrivi'</span>, (req, res) => {
+  <span class="c-nome">scrivi</span>(<span class="c-nome">leggi</span>().<span class="c-chiave">filter</span>((x) => x.endpoint !== req.body?.endpoint));
+  res.<span class="c-chiave">json</span>({ ok: <span class="c-chiave">true</span> });
+});
+
+<span class="c-commento">// ④ Invio a tutti. Fa squillare OGNI telefono iscritto: nasce chiusa.</span>
+app.<span class="c-chiave">post</span>(<span class="c-stringa">'/api/invia'</span>, <span class="c-chiave">async</span> (req, res) => {
+  <span class="c-chiave">if</span> (!process.env.TOKEN_INVIO ||
+      req.<span class="c-chiave">get</span>(<span class="c-stringa">'x-token-invio'</span>) !== process.env.TOKEN_INVIO) {
+    <span class="c-chiave">return</span> res.<span class="c-chiave">status</span>(<span class="c-numero">401</span>).<span class="c-chiave">json</span>({ errore: <span class="c-stringa">'token non valido'</span> });
+  }
+
+  <span class="c-chiave">const</span> carico = <span class="c-nome">JSON</span>.<span class="c-chiave">stringify</span>({
+    titolo: <span class="c-nome">String</span>(req.body?.titolo || <span class="c-stringa">'Notifica'</span>).<span class="c-chiave">slice</span>(<span class="c-numero">0</span>, <span class="c-numero">100</span>),
+    testo: <span class="c-nome">String</span>(req.body?.testo || <span class="c-stringa">''</span>).<span class="c-chiave">slice</span>(<span class="c-numero">0</span>, <span class="c-numero">300</span>),
+    url: <span class="c-stringa">'/'</span>,
+  });
+
+  <span class="c-chiave">const</span> elenco = <span class="c-nome">leggi</span>();
+  <span class="c-chiave">const</span> vivi = [];
+  <span class="c-chiave">let</span> ok = <span class="c-numero">0</span>;
+
+  <span class="c-chiave">for</span> (<span class="c-chiave">const</span> v <span class="c-chiave">of</span> elenco) {
+    <span class="c-chiave">try</span> {
+      <span class="c-commento">// TTL 24h: una notifica piu' vecchia di un giorno non interessa</span>
+      <span class="c-commento">// piu' a nessuno, e il servizio push puo' smettere di riprovare.</span>
+      <span class="c-chiave">await</span> webpush.<span class="c-chiave">sendNotification</span>(v, carico, { TTL: <span class="c-numero">86400</span> });
+      vivi.<span class="c-chiave">push</span>(v); ok++;
+    } <span class="c-chiave">catch</span> (e) {
+      <span class="c-commento">// 404/410 = app disinstallata o permesso revocato. Va CANCELLATA:</span>
+      <span class="c-commento">// e' l'unico modo che il protocollo offre per sapere che un</span>
+      <span class="c-commento">// dispositivo se n'e' andato. Chi non lo fa accumula invii falliti</span>
+      <span class="c-commento">// per sempre.</span>
+      <span class="c-chiave">if</span> (e.statusCode !== <span class="c-numero">404</span> &amp;&amp; e.statusCode !== <span class="c-numero">410</span>) vivi.<span class="c-chiave">push</span>(v);
+      <span class="c-nome">console</span>.<span class="c-chiave">error</span>(<span class="c-stringa">'invio fallito'</span>, e.statusCode, e.body);
+    }
+  }
+  <span class="c-chiave">if</span> (vivi.length !== elenco.length) <span class="c-nome">scrivi</span>(vivi);
+
+  res.<span class="c-chiave">json</span>({ inviate: ok, totale: elenco.length });
+});
+
+<span class="c-commento">// Dietro un reverse proxy si ascolta SOLO sul loopback: da fuori si arriva</span>
+<span class="c-commento">// unicamente passando dal proxy, che e' quello che fa HTTPS.</span>
+app.<span class="c-chiave">listen</span>(process.env.PORT || <span class="c-numero">3020</span>, <span class="c-stringa">'127.0.0.1'</span>, () =&gt;
+  <span class="c-nome">console</span>.<span class="c-chiave">log</span>(<span class="c-stringa">'in ascolto'</span>));</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="client">
+  <h2><span class="numero">5</span>Il client, per intero</h2>
+  <p class="occhiello-sez">
+    Sessanta righe. Le tre insidie sono segnate nei commenti.
+  </p>
+
+  <p class="titolo-codice">public/app.js</p>
+<pre translate="no"><code><span class="c-commento">// La chiave VAPID arriva in base64url (- e _ al posto di + e /, senza =) ma</span>
+<span class="c-commento">// subscribe() vuole un Uint8Array. Senza questa conversione fallisce senza un</span>
+<span class="c-commento">// messaggio utile: e' l'errore piu' comune in assoluto.</span>
+<span class="c-chiave">function</span> <span class="c-nome">toUint8</span>(base64Url) {
+  <span class="c-chiave">const</span> pad = <span class="c-stringa">'='</span>.<span class="c-chiave">repeat</span>((<span class="c-numero">4</span> - (base64Url.length % <span class="c-numero">4</span>)) % <span class="c-numero">4</span>);
+  <span class="c-chiave">const</span> b64 = (base64Url + pad).<span class="c-chiave">replace</span>(/-/g, <span class="c-stringa">'+'</span>).<span class="c-chiave">replace</span>(/_/g, <span class="c-stringa">'/'</span>);
+  <span class="c-chiave">return</span> <span class="c-nome">Uint8Array</span>.<span class="c-chiave">from</span>(<span class="c-chiave">atob</span>(b64), (c) =&gt; c.<span class="c-chiave">charCodeAt</span>(<span class="c-numero">0</span>));
+}
+
+<span class="c-chiave">let</span> registrazione = <span class="c-chiave">null</span>;
+<span class="c-chiave">let</span> iscrizione = <span class="c-chiave">null</span>;
+
+<span class="c-chiave">async function</span> <span class="c-nome">avvia</span>() {
+  <span class="c-chiave">if</span> (!(<span class="c-stringa">'serviceWorker'</span> <span class="c-chiave">in</span> navigator)) <span class="c-chiave">return</span>;
+
+  <span class="c-chiave">await</span> navigator.serviceWorker.<span class="c-chiave">register</span>(<span class="c-stringa">'/sw.js'</span>, { scope: <span class="c-stringa">'/'</span> });
+  <span class="c-commento">// .ready attende un worker ATTIVO. register() da solo puo' restituirne uno</span>
+  <span class="c-commento">// ancora in installazione, e subscribe() su quello fallisce senza dire perche'.</span>
+  registrazione = <span class="c-chiave">await</span> navigator.serviceWorker.ready;
+
+  <span class="c-commento">// Su iPhone in Safari con l'app NON installata, pushManager non esiste.</span>
+  <span class="c-commento">// Non e' un guasto: e' il modello di Apple, ed e' il caso piu' frequente.</span>
+  <span class="c-chiave">if</span> (!registrazione.pushManager) <span class="c-chiave">return</span>;
+
+  iscrizione = <span class="c-chiave">await</span> registrazione.pushManager.<span class="c-chiave">getSubscription</span>();
+  <span class="c-nome">aggiornaPulsante</span>();
+}
+
+<span class="c-commento">// DA UN TOCCO. Nessun await prima di requestPermission(): un'attesa rompe il</span>
+<span class="c-commento">// legame col gesto, e su iOS la richiesta viene ignorata in silenzio.</span>
+<span class="c-nome">document</span>.<span class="c-chiave">getElementById</span>(<span class="c-stringa">'attiva'</span>).<span class="c-chiave">addEventListener</span>(<span class="c-stringa">'click'</span>, <span class="c-chiave">async</span> () =&gt; {
+  <span class="c-chiave">const</span> permesso = <span class="c-chiave">await</span> <span class="c-nome">Notification</span>.<span class="c-chiave">requestPermission</span>();
+  <span class="c-chiave">if</span> (permesso !== <span class="c-stringa">'granted'</span>) <span class="c-chiave">return</span>;  <span class="c-commento">// 'denied' e' DEFINITIVO</span>
+
+  <span class="c-chiave">const</span> { chiave } = <span class="c-chiave">await</span> (<span class="c-chiave">await</span> <span class="c-chiave">fetch</span>(<span class="c-stringa">'/api/chiave-pubblica'</span>)).<span class="c-chiave">json</span>();
+
+  iscrizione = <span class="c-chiave">await</span> registrazione.pushManager.<span class="c-chiave">subscribe</span>({
+    userVisibleOnly: <span class="c-chiave">true</span>,   <span class="c-commento">// obbligatorio su Chrome</span>
+    applicationServerKey: <span class="c-nome">toUint8</span>(chiave),
+  });
+
+  <span class="c-chiave">await</span> <span class="c-chiave">fetch</span>(<span class="c-stringa">'/api/iscrivi'</span>, {
+    method: <span class="c-stringa">'POST'</span>,
+    headers: { <span class="c-stringa">'Content-Type'</span>: <span class="c-stringa">'application/json'</span> },
+    <span class="c-commento">// .toJSON() serve: la subscription non e' un oggetto semplice e</span>
+    <span class="c-commento">// JSON.stringify() diretto restituirebbe {} su alcuni browser.</span>
+    body: <span class="c-nome">JSON</span>.<span class="c-chiave">stringify</span>({ iscrizione: iscrizione.<span class="c-chiave">toJSON</span>() }),
+  });
+
+  <span class="c-nome">aggiornaPulsante</span>();
+});
+
+<span class="c-nome">document</span>.<span class="c-chiave">getElementById</span>(<span class="c-stringa">'spegni'</span>).<span class="c-chiave">addEventListener</span>(<span class="c-stringa">'click'</span>, <span class="c-chiave">async</span> () =&gt; {
+  <span class="c-chiave">if</span> (!iscrizione) <span class="c-chiave">return</span>;
+  <span class="c-chiave">const</span> endpoint = iscrizione.endpoint;
+  <span class="c-chiave">await</span> iscrizione.<span class="c-chiave">unsubscribe</span>();
+  <span class="c-chiave">await</span> <span class="c-chiave">fetch</span>(<span class="c-stringa">'/api/disiscrivi'</span>, {
+    method: <span class="c-stringa">'POST'</span>,
+    headers: { <span class="c-stringa">'Content-Type'</span>: <span class="c-stringa">'application/json'</span> },
+    body: <span class="c-nome">JSON</span>.<span class="c-chiave">stringify</span>({ endpoint }),
+  });
+  iscrizione = <span class="c-chiave">null</span>;
+  <span class="c-nome">aggiornaPulsante</span>();
+});
+
+<span class="c-chiave">function</span> <span class="c-nome">aggiornaPulsante</span>() {
+  <span class="c-commento">// ATTENZIONE: permission === 'granted' NON implica un'iscrizione attiva.</span>
+  <span class="c-commento">// Sono due cose distinte, ed e' li' che si perde mezza giornata.</span>
+  <span class="c-nome">document</span>.<span class="c-chiave">getElementById</span>(<span class="c-stringa">'attiva'</span>).hidden = !!iscrizione;
+  <span class="c-nome">document</span>.<span class="c-chiave">getElementById</span>(<span class="c-stringa">'spegni'</span>).hidden = !iscrizione;
+}
+
+<span class="c-nome">avvia</span>();</code></pre>
+
+  <div class="nota attenzione">
+    <span class="capo">Tre insidie, in una riga ciascuna</span>
+    <p>
+      <strong>1.</strong> La chiave va convertita in <code>Uint8Array</code>.
+      <strong>2.</strong> Serve <code>.ready</code>, non solo <code>.register()</code>.
+      <strong>3.</strong> <code>requestPermission()</code> deve partire dal tocco, senza
+      <code>await</code> prima.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="sw">
+  <h2><span class="numero">6</span>Il service worker</h2>
+  <p class="occhiello-sez">
+    Venti righe, e una regola che se violata ti costa l'iscrizione.
+  </p>
+
+  <p class="titolo-codice">sw.js — nella radice del progetto, non in public/</p>
+<pre translate="no"><code><span class="c-nome">self</span>.<span class="c-chiave">addEventListener</span>(<span class="c-stringa">'push'</span>, (event) =&gt; {
+  <span class="c-chiave">let</span> d = {};
+  <span class="c-chiave">try</span> { d = event.data ? event.data.<span class="c-chiave">json</span>() : {}; } <span class="c-chiave">catch</span> (e) { d = {}; }
+
+  <span class="c-commento">// waitUntil e' OBBLIGATORIO: senza, il browser puo' terminare il worker</span>
+  <span class="c-commento">// prima che showNotification() abbia finito, e la notifica sparisce.</span>
+  event.<span class="c-chiave">waitUntil</span>(
+    <span class="c-nome">self</span>.registration.<span class="c-chiave">showNotification</span>(d.titolo || <span class="c-stringa">'Notifica'</span>, {
+      body: d.testo || <span class="c-stringa">'Hai un aggiornamento.'</span>,
+      icon: <span class="c-stringa">'/icone/192.png'</span>,
+      badge: <span class="c-stringa">'/icone/192.png'</span>,
+      data: { url: d.url || <span class="c-stringa">'/'</span> },
+    })
+  );
+});
+
+<span class="c-nome">self</span>.<span class="c-chiave">addEventListener</span>(<span class="c-stringa">'notificationclick'</span>, (event) =&gt; {
+  event.notification.<span class="c-chiave">close</span>();
+  <span class="c-chiave">const</span> url = event.notification.data?.url || <span class="c-stringa">'/'</span>;
+  event.<span class="c-chiave">waitUntil</span>(
+    <span class="c-nome">self</span>.clients.<span class="c-chiave">matchAll</span>({ type: <span class="c-stringa">'window'</span>, includeUncontrolled: <span class="c-chiave">true</span> })
+      .<span class="c-chiave">then</span>((finestre) =&gt; {
+        <span class="c-commento">// Se l'app e' gia' aperta si riporta in primo piano quella: aprirne</span>
+        <span class="c-commento">// una seconda copia confonde, e su iOS non e' nemmeno possibile.</span>
+        <span class="c-chiave">const</span> f = finestre.<span class="c-chiave">find</span>((x) =&gt; x.url.<span class="c-chiave">includes</span>(<span class="c-nome">self</span>.location.origin));
+        <span class="c-chiave">return</span> f ? f.<span class="c-chiave">focus</span>() : <span class="c-nome">self</span>.clients.<span class="c-chiave">openWindow</span>(url);
+      })
+  );
+});</code></pre>
+
+  <div class="nota pericolo">
+    <span class="capo">La regola che non si viola</span>
+    <p>
+      <strong>Ogni evento <code>push</code> deve finire in una notifica visibile.</strong>
+      Se il gestore non chiama <code>showNotification()</code>, Safari
+      <strong>revoca l'iscrizione</strong> e Chrome mostra al posto tuo «questo sito è
+      stato aggiornato in background».
+    </p>
+    <p>
+      Guarda il <code>catch</code> qui sopra: <em>non</em> esce, imposta
+      <code>d = {}</code> e tira dritto. Un push senza corpo è legittimo e capita. Se
+      metti un <code>return</code> lì dentro, fra qualche giorno le notifiche
+      smetteranno di arrivare e non capirai perché.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="prova">
+  <h2><span class="numero">7</span>Provarlo</h2>
+  <p class="occhiello-sez">In locale si arriva fin dove è possibile. Poi serve il telefono.</p>
+
+<pre translate="no"><code>node server.js
+<span class="c-commento"># apri http://127.0.0.1:3020 — localhost e' considerato contesto sicuro,</span>
+<span class="c-commento"># quindi il service worker si registra e il permesso si puo' chiedere.</span>
+
+<span class="c-commento"># poi, da un altro terminale:</span>
+curl -X POST http://127.0.0.1:3020/api/invia \
+  -H <span class="c-stringa">'X-Token-Invio: una-frase-lunga-a-caso'</span> \
+  -H <span class="c-stringa">'Content-Type: application/json'</span> \
+  -d <span class="c-stringa">'{"titolo":"Funziona","testo":"Prima notifica."}'</span></code></pre>
+
+  <div class="nota pericolo">
+    <span class="capo">Sul telefono serve HTTPS vero</span>
+    <p>
+      Un certificato autofirmato <strong>non basta</strong>: su iOS impedisce anche
+      l'installazione. Servono un dominio e un certificato valido — con Caddy sono
+      tre righe e il certificato lo ottiene da solo:
+    </p>
+  </div>
+
+  <p class="titolo-codice">/etc/caddy/Caddyfile</p>
+<pre translate="no"><code>tuo.dominio.it {
+    encode gzip
+    reverse_proxy 127.0.0.1:3020
+}</code></pre>
+
+  <div class="nota attenzione">
+    <span class="capo">Su iPhone: due cose, in quest'ordine</span>
+    <p>
+      <strong>1.</strong> L'app va <strong>aggiunta alla schermata Home</strong> — in
+      Safari, oppure (da iOS 16.4) da Chrome, Edge, Firefox o DuckDuckGo, sempre dal
+      menu Condividi. <strong>2.</strong> Va aperta <strong>dall'icona</strong>. In
+      Safari, il pulsante non farà mai nulla.
+    </p>
+  </div>
+
+  <h3>Se non arriva</h3>
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Cosa vedi</th><th>Cosa significa</th></tr></thead>
+      <tbody>
+        <tr><td><code>subscribe()</code> fallisce, messaggio inutile</td>
+          <td>Chiave non convertita in <code>Uint8Array</code>.</td></tr>
+        <tr><td><code>403</code> a ogni invio</td>
+          <td>Le iscrizioni sono di un'altra coppia di chiavi. Vanno rifatte dal dispositivo.</td></tr>
+        <tr><td><code>410</code></td>
+          <td>App disinstallata o permesso revocato. Cancella quell'iscrizione.</td></tr>
+        <tr><td>Il server dice <code>inviate: 1</code> ma niente arriva</td>
+          <td>Consegnata a Google/Apple, non mostrata dal telefono: offline, o notifiche
+            silenziate per quell'app nelle impostazioni di sistema.</td></tr>
+        <tr><td>Su iPhone il permesso non viene mai chiesto</td>
+          <td>L'app è stata aperta dal browser e non dall'icona.</td></tr>
+        <tr><td>Le correzioni a <code>sw.js</code> non hanno effetto</td>
+          <td>È servito dalla cache: manca <code>Cache-Control: no-cache</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota buona">
+    <span class="capo">Il consiglio che vale più di tutti</span>
+    <p>
+      La riga <code>inviate: 1</code> dice solo che <strong>Google o Apple hanno
+      accettato</strong>. Non dice che la notifica sia comparsa su uno schermo. Se hai
+      dieci minuti, falli spendere al service worker per riferirtelo: una
+      <code>fetch('/api/annota')</code> dentro il <code>.then()</code> di
+      <code>showNotification()</code>, e il tuo registro sa una cosa che altrimenti
+      nessuno saprebbe mai. Ma <strong>dopo</strong> la notifica, e con un
+      <code>.catch()</code> che assorba gli errori: lo strumento di misura non deve
+      mai poter guastare ciò che misura.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="utenti">
+  <h2><span class="numero">8</span>Un messaggio per ogni utente</h2>
+  <p class="occhiello-sez">
+    Sì, si fa — ed è il caso normale. Ma ci sono due trappole di sicurezza che
+    fanno arrivare i messaggi alla persona sbagliata.
+  </p>
+
+  <div class="nota">
+    <span class="capo">Il concetto che spiega tutto il resto</span>
+    <p>
+      <strong>L'iscrizione appartiene al dispositivo, non alla persona.</strong> Il
+      browser chiede una casella postale e non sa nulla dei tuoi utenti. Il
+      collegamento fra la casella e l'utente lo fai <em>tu</em>, al momento
+      dell'iscrizione, e da quel momento in poi è responsabilità tua tenerlo giusto.
+    </p>
+    <p>
+      Da qui discende tutto: un utente può avere <strong>più dispositivi</strong> (più
+      righe), e un dispositivo può cambiare <strong>utente</strong> — ed è lì che si fa
+      il danno.
+    </p>
+  </div>
+
+  <div class="diagramma">
+    <svg viewBox="0 0 820 300" role="img" aria-label="Utente 1 ha due righe nell'archivio, iPhone e portatile; utente 2 ne ha una, un Android. notifica per l'utente 1 raggiunge solo le sue due righe. Al logout dell'utente 1 le sue righe vengono cancellate.">
+      <defs>
+        <marker id="u" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" class="d-punta"/></marker>
+        <marker id="uok" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" class="d-punta-ok"/></marker>
+      </defs>
+      <text x="20" y="22" class="d-etichetta">UTENTI (dalla sessione)</text>
+      <text x="290" y="22" class="d-etichetta">ARCHIVIO ISCRIZIONI — una riga per dispositivo</text>
+      <text x="630" y="22" class="d-etichetta">INVIO</text>
+
+      <rect x="20" y="52" width="170" height="56" rx="12" class="d-scatola-forte"/>
+      <text x="105" y="76" text-anchor="middle" class="d-testo">utente 1</text>
+      <text x="105" y="94" text-anchor="middle" class="d-piccolo">due dispositivi</text>
+      <rect x="20" y="168" width="170" height="56" rx="12" class="d-scatola"/>
+      <text x="105" y="192" text-anchor="middle" class="d-testo">utente 2</text>
+      <text x="105" y="210" text-anchor="middle" class="d-piccolo">un dispositivo</text>
+
+      <rect x="290" y="40" width="270" height="38" rx="9" class="d-scatola"/>
+      <text x="305" y="64" class="d-piccolo">utenteId 1 · iPhone · endpoint …QF3a</text>
+      <rect x="290" y="88" width="270" height="38" rx="9" class="d-scatola"/>
+      <text x="305" y="112" class="d-piccolo">utenteId 1 · portatile · endpoint …8kMz</text>
+      <rect x="290" y="178" width="270" height="38" rx="9" class="d-scatola"/>
+      <text x="305" y="202" class="d-piccolo">utenteId 2 · Android · endpoint …P1xd</text>
+
+      <path d="M190 72 L240 72 L240 59 L282 59" class="d-freccia" marker-end="url(#u)"/>
+      <path d="M190 88 L240 88 L240 107 L282 107" class="d-freccia" marker-end="url(#u)"/>
+      <path d="M190 196 L282 196" class="d-freccia" marker-end="url(#u)"/>
+
+      <rect x="630" y="58" width="170" height="52" rx="12" class="d-scatola-ok"/>
+      <text x="715" y="81" text-anchor="middle" class="d-testo">notifica(1, …)</text>
+      <text x="715" y="98" text-anchor="middle" class="d-piccolo">filtra per utenteId</text>
+      <path d="M630 74 L600 74 L600 59 L568 59" class="d-freccia-ok" marker-end="url(#uok)"/>
+      <path d="M630 94 L600 94 L600 107 L568 107" class="d-freccia-ok" marker-end="url(#uok)"/>
+      <text x="610" y="160" class="d-corsivo">l'utente 2 non riceve nulla</text>
+
+      <line x1="20" y1="246" x2="800" y2="246" class="d-separatore"/>
+      <text x="20" y="276" class="d-testo">Logout dell'utente 1</text>
+      <text x="200" y="276" class="d-piccolo">→ il server cancella le sue due righe: quei dispositivi smettono subito di ricevere</text>
+    </svg>
+  </div>
+  <p class="didascalia">
+    L'utente si legge dalla <strong>sessione</strong>, mai dal corpo della richiesta.
+    Un dispositivo usato da un altro utente cambia proprietario: è la stessa riga,
+    con un nuovo <code>utenteId</code>.
+  </p>
+
+  <h3>L'archivio: una riga per dispositivo</h3>
+<pre translate="no"><code>[
+  { <span class="c-nome">"utenteId"</span>: <span class="c-numero">1</span>, <span class="c-nome">"endpoint"</span>: <span class="c-stringa">"https://web.push.apple.com/QF3…"</span>, <span class="c-nome">"keys"</span>: {…} },
+  { <span class="c-nome">"utenteId"</span>: <span class="c-numero">1</span>, <span class="c-nome">"endpoint"</span>: <span class="c-stringa">"https://fcm.googleapis.com/…"</span>,  <span class="c-nome">"keys"</span>: {…} },
+  { <span class="c-nome">"utenteId"</span>: <span class="c-numero">2</span>, <span class="c-nome">"endpoint"</span>: <span class="c-stringa">"https://web.push.apple.com/8kM…"</span>, <span class="c-nome">"keys"</span>: {…} }
+]</code></pre>
+  <p>
+    L'utente 1 ha due dispositivi — iPhone e portatile — e riceverà su entrambi.
+    L'<code>endpoint</code> resta la chiave primaria: è unico per
+    <em>dispositivo + browser + sito</em>.
+  </p>
+
+  <h3>Iscrizione: l'utente si legge dalla sessione, mai dal corpo</h3>
+
+  <div class="nota pericolo">
+    <span class="capo">Trappola 1 — il campo utenteId che arriva dal client</span>
+    <p>
+      Se il server si fida di un <code>utenteId</code> mandato dalla pagina, chiunque
+      può iscriversi come utente 5 e <strong>ricevere le notifiche di utente 5</strong>.
+      Basta cambiare una riga nella console del browser. L'utente va letto
+      <strong>dalla sessione</strong>, esattamente come faresti per qualunque altra
+      rotta riservata.
+    </p>
+  </div>
+
+  <p class="titolo-codice">server.js — la rotta di iscrizione, autenticata</p>
+<pre translate="no"><code>app.<span class="c-chiave">post</span>(<span class="c-stringa">'/api/iscrivi'</span>, (req, res) =&gt; {
+  <span class="c-commento">// L'utente viene da QUI: sessione, cookie firmato, JWT verificato —</span>
+  <span class="c-commento">// quello che gia' usi nel resto dell'applicazione.</span>
+  <span class="c-commento">// MAI da req.body.utenteId: quello lo scrive il browser.</span>
+  <span class="c-chiave">const</span> utenteId = req.session?.utenteId;
+
+  <span class="c-commento">// Se non e' loggato non si iscrive nessuno. Non e' una restrizione:</span>
+  <span class="c-commento">// un'iscrizione senza proprietario e' una casella che non sapresti a chi</span>
+  <span class="c-commento">// attribuire, e prima o poi ci manderesti dentro la cosa sbagliata.</span>
+  <span class="c-chiave">if</span> (!utenteId) <span class="c-chiave">return</span> res.<span class="c-chiave">status</span>(<span class="c-numero">401</span>).<span class="c-chiave">json</span>({ errore: <span class="c-stringa">'non autenticato'</span> });
+
+  <span class="c-chiave">const</span> s = req.body?.iscrizione;
+  <span class="c-chiave">if</span> (!s?.endpoint?.<span class="c-chiave">startsWith</span>(<span class="c-stringa">'https://'</span>) || !s.keys?.p256dh || !s.keys?.auth) {
+    <span class="c-chiave">return</span> res.<span class="c-chiave">status</span>(<span class="c-numero">400</span>).<span class="c-chiave">json</span>({ errore: <span class="c-stringa">'iscrizione incompleta'</span> });
+  }
+
+  <span class="c-commento">// L'endpoint e' la chiave: se quel dispositivo era di un altro utente, la</span>
+  <span class="c-commento">// riga viene SOSTITUITA. E' il caso del telefono prestato, o del computer</span>
+  <span class="c-commento">// in ufficio: chi si iscrive adesso e' il nuovo proprietario.</span>
+  <span class="c-chiave">const</span> elenco = <span class="c-nome">leggi</span>().<span class="c-chiave">filter</span>((x) =&gt; x.endpoint !== s.endpoint);
+  elenco.<span class="c-chiave">push</span>({
+    utenteId,
+    endpoint: s.endpoint,
+    keys: s.keys,
+    quando: <span class="c-chiave">new</span> <span class="c-nome">Date</span>().<span class="c-chiave">toISOString</span>(),
+  });
+  <span class="c-nome">scrivi</span>(elenco);
+  res.<span class="c-chiave">json</span>({ ok: <span class="c-chiave">true</span> });
+});</code></pre>
+
+  <h3>Invio mirato</h3>
+  <p class="titolo-codice">server.js — una funzione, non una rotta pubblica</p>
+<pre translate="no"><code><span class="c-commento">// Questa la chiama il TUO codice quando succede qualcosa che riguarda</span>
+<span class="c-commento">// quell'utente: un ordine spedito, un messaggio ricevuto, una scadenza.</span>
+<span class="c-chiave">async function</span> <span class="c-nome">notifica</span>(utenteId, titolo, testo, url = <span class="c-stringa">'/'</span>) {
+  <span class="c-chiave">const</span> carico = <span class="c-nome">JSON</span>.<span class="c-chiave">stringify</span>({ titolo, testo, url });
+  <span class="c-chiave">const</span> elenco = <span class="c-nome">leggi</span>();
+  <span class="c-chiave">const</span> vivi = [];
+
+  <span class="c-chiave">for</span> (<span class="c-chiave">const</span> v <span class="c-chiave">of</span> elenco) {
+    <span class="c-commento">// Tutti i dispositivi di quell'utente, e solo quelli.</span>
+    <span class="c-chiave">if</span> (v.utenteId !== utenteId) { vivi.<span class="c-chiave">push</span>(v); <span class="c-chiave">continue</span>; }
+    <span class="c-chiave">try</span> {
+      <span class="c-chiave">await</span> webpush.<span class="c-chiave">sendNotification</span>(v, carico, { TTL: <span class="c-numero">86400</span> });
+      vivi.<span class="c-chiave">push</span>(v);
+    } <span class="c-chiave">catch</span> (e) {
+      <span class="c-chiave">if</span> (e.statusCode !== <span class="c-numero">404</span> &amp;&amp; e.statusCode !== <span class="c-numero">410</span>) vivi.<span class="c-chiave">push</span>(v);
+    }
+  }
+  <span class="c-chiave">if</span> (vivi.length !== elenco.length) <span class="c-nome">scrivi</span>(vivi);
+}
+
+<span class="c-commento">// Uso, da qualunque punto dell'applicazione:</span>
+<span class="c-chiave">await</span> <span class="c-nome">notifica</span>(<span class="c-numero">1</span>, <span class="c-stringa">'Ordine spedito'</span>, <span class="c-stringa">'Il tuo ordine #4821 è partito.'</span>, <span class="c-stringa">'/ordini/4821'</span>);
+<span class="c-chiave">await</span> <span class="c-nome">notifica</span>(<span class="c-numero">2</span>, <span class="c-stringa">'Nuovo messaggio'</span>, <span class="c-stringa">'Hai ricevuto un messaggio.'</span>, <span class="c-stringa">'/messaggi'</span>);</code></pre>
+
+  <h3>Il logout deve disiscrivere</h3>
+
+  <div class="nota pericolo">
+    <span class="capo">Trappola 2 — la più insidiosa delle due</span>
+    <p>
+      Se al logout non cancelli l'iscrizione, <strong>quel dispositivo continua a
+      ricevere le notifiche dell'utente che se n'è andato</strong>. Il telefono è
+      ancora iscritto, la riga nell'archivio punta ancora a lui, e il sistema
+      operativo mostrerà «Hai un nuovo messaggio da…» sullo schermo bloccato di
+      chiunque abbia quel telefono in mano.
+    </p>
+    <p>
+      Sul computer di un ufficio o su un telefono prestato è una fuga di dati vera,
+      e non se ne accorge nessuno finché non è successo.
+    </p>
+  </div>
+
+  <p class="titolo-codice">public/app.js — da chiamare PRIMA di chiudere la sessione</p>
+<pre translate="no"><code><span class="c-chiave">async function</span> <span class="c-nome">esci</span>() {
+  <span class="c-chiave">const</span> reg = <span class="c-chiave">await</span> navigator.serviceWorker?.ready;
+  <span class="c-chiave">const</span> sub = <span class="c-chiave">await</span> reg?.pushManager?.<span class="c-chiave">getSubscription</span>();
+
+  <span class="c-chiave">if</span> (sub) {
+    <span class="c-commento">// Prima si dice al server di dimenticare questo dispositivo — mentre la</span>
+    <span class="c-commento">// sessione e' ancora valida, o la rotta risponderebbe 401 — poi si</span>
+    <span class="c-commento">// disdice la casella lato browser.</span>
+    <span class="c-chiave">await</span> <span class="c-chiave">fetch</span>(<span class="c-stringa">'/api/disiscrivi'</span>, {
+      method: <span class="c-stringa">'POST'</span>,
+      headers: { <span class="c-stringa">'Content-Type'</span>: <span class="c-stringa">'application/json'</span> },
+      body: <span class="c-nome">JSON</span>.<span class="c-chiave">stringify</span>({ endpoint: sub.endpoint }),
+    });
+    <span class="c-chiave">await</span> sub.<span class="c-chiave">unsubscribe</span>();
+  }
+
+  <span class="c-chiave">await</span> <span class="c-chiave">fetch</span>(<span class="c-stringa">'/api/logout'</span>, { method: <span class="c-stringa">'POST'</span> });
+  location.href = <span class="c-stringa">'/'</span>;
+}</code></pre>
+
+  <p>
+    E come rete di sicurezza, perché un logout può anche non avvenire mai — schede
+    chiuse, sessioni scadute, telefoni persi:
+  </p>
+
+  <p class="titolo-codice">server.js — al logout lato server, e alla scadenza sessione</p>
+<pre translate="no"><code><span class="c-commento">// Se l'utente esce senza che la pagina abbia fatto in tempo a disiscriversi,</span>
+<span class="c-commento">// il server toglie comunque le sue caselle. Meglio una notifica non</span>
+<span class="c-commento">// recapitata che una recapitata alla persona sbagliata.</span>
+app.<span class="c-chiave">post</span>(<span class="c-stringa">'/api/logout'</span>, (req, res) =&gt; {
+  <span class="c-chiave">const</span> utenteId = req.session?.utenteId;
+  <span class="c-chiave">if</span> (utenteId) <span class="c-nome">scrivi</span>(<span class="c-nome">leggi</span>().<span class="c-chiave">filter</span>((x) =&gt; x.utenteId !== utenteId));
+  req.session?.<span class="c-chiave">destroy</span>?.();
+  res.<span class="c-chiave">json</span>({ ok: <span class="c-chiave">true</span> });
+});</code></pre>
+
+  <div class="nota attenzione">
+    <span class="capo">Una scelta da fare, consapevolmente</span>
+    <p>
+      Il codice qui sopra al logout toglie <strong>tutte</strong> le caselle di
+      quell'utente, cioè lo disiscrive anche dagli <em>altri</em> suoi dispositivi.
+      È la scelta prudente, non l'unica: se vuoi che uscendo dal portatile il
+      telefono continui a ricevere, filtra anche per <code>endpoint</code> — ma
+      allora il logout lato client diventa l'unico che pulisce davvero quel
+      dispositivo, e va fatto funzionare bene.
+    </p>
+  </div>
+
+  <h3>Non loggato: nessun messaggio</h3>
+  <p>Tre righe di difesa, e servono tutte e tre:</p>
+  <ol class="numerata">
+    <li><strong>Il pulsante non c'è.</strong> Si mostra «attiva le notifiche» solo a
+      sessione aperta. Chi non è loggato non vede nemmeno la proposta.</li>
+    <li><strong>La rotta rifiuta.</strong> <code>/api/iscrivi</code> risponde
+      <code>401</code> senza sessione — perché il pulsante nascosto ferma l'utente
+      distratto, non chi apre la console.</li>
+    <li><strong>L'invio filtra per <code>utenteId</code>.</strong> Una riga senza
+      proprietario non corrisponde a nessun invio mirato, quindi non riceve nulla
+      per costruzione, non per controllo.</li>
+  </ol>
+
+  <div class="nota buona">
+    <span class="capo">Sul contenuto: la cifratura non è privacy sullo schermo</span>
+    <p>
+      Il payload viaggia <strong>cifrato</strong> con le chiavi del dispositivo: né
+      Google né Apple possono leggerlo. Ma la notifica poi <strong>compare sullo
+      schermo bloccato</strong>, dove la legge chiunque guardi il telefono.
+    </p>
+    <p>
+      Quindi: «Hai un nuovo messaggio» va bene, «Il dott. Rossi conferma la visita di
+      giovedì» no. Se il contenuto è delicato, manda l'avviso e fai aprire l'app —
+      <code>notificationclick</code> porta l'utente dove serve, e lì c'è la sessione
+      a proteggere ciò che mostri.
+    </p>
+  </div>
+
+  <h3>Riepilogo dei casi</h3>
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Situazione</th><th>Cosa succede</th></tr></thead>
+      <tbody>
+        <tr><td>Utente 1 con iPhone e portatile</td>
+          <td>Due righe, stesso <code>utenteId</code>. Riceve su entrambi.</td></tr>
+        <tr><td>Utente 2 si iscrive sul telefono dell'utente 1</td>
+          <td>Stesso <code>endpoint</code>: la riga viene sostituita. Il nuovo proprietario
+            è l'utente 2.</td></tr>
+        <tr><td>Utente 1 fa logout</td>
+          <td>Le sue caselle vengono cancellate: quel telefono smette di ricevere.</td></tr>
+        <tr><td>Visitatore non loggato</td>
+          <td>Nessun pulsante, <code>401</code> se ci prova, e nessuna riga nell'archivio.</td></tr>
+        <tr><td>Utente disinstalla l'app</td>
+          <td>Il primo invio risponde <code>410</code> e la riga si cancella da sé.</td></tr>
+        <tr><td>Utente cancella l'account</td>
+          <td>Cancella anche le sue righe: sono dati personali quanto l'indirizzo email.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="oltre">
+  <h2><span class="numero">9</span>Quando cresce</h2>
+  <p class="occhiello-sez">Cosa cambiare, e solo quando serve davvero.</p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Quando</th><th>Cosa cambiare</th></tr></thead>
+      <tbody>
+        <tr><td>Oltre qualche migliaio di iscritti</td>
+          <td>Il file JSON si rilegge tutto a ogni scrittura. SQLite basta e avanza,
+            e resta un file solo.</td></tr>
+        <tr><td>Devi mandare a <em>una</em> persona</td>
+          <td>È la <a href="#utenti">sezione 8</a>: un <code>utenteId</code> sulla riga
+            d'archivio, letto dalla sessione e mai dal client.</td></tr>
+        <tr><td>Invii lenti o numerosi</td>
+          <td>Metti gli invii in coda invece di farli dentro la richiesta HTTP:
+            con mille dispositivi il <code>for</code> qui sopra tiene aperta la
+            connessione per minuti.</td></tr>
+        <tr><td>Un utente su più dispositivi</td>
+          <td>Funziona già: ogni dispositivo è una riga a sé. Ma il <strong>logout deve
+            disiscrivere</strong>, o il telefono continua a ricevere i messaggi di chi se
+            n'è andato — <a href="#utenti">sezione 8</a>.</td></tr>
+        <tr><td>Vuoi sapere chi apre le notifiche</td>
+          <td><code>notificationclick</code> nel service worker: una
+            <code>fetch</code> verso il tuo server prima del <code>focus()</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota">
+    <span class="capo">Quello che NON serve</span>
+    <p>
+      Firebase, OneSignal, un SDK, un account. Tutto quello che c'è qui sopra è lo
+      standard W3C: gira sul tuo server, i dati restano tuoi, e funziona su Android,
+      iPhone e desktop con lo stesso codice.
+    </p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    Dal progetto <a href="https://github.com/JoeBosi/pwa-push-lab" rel="noopener"><strong>pwa-push-lab</strong> su GitHub</a> (codice sorgente, licenza MIT) ·
+    <a href="/architettura">l'architettura completa</a> ·
+    <a href="/laboratorio">il verbale delle prove</a> ·
+    <a href="https://pwa.example.com">pwa.example.com</a>
+  </p>
+  <p>
+    Tutto il codice di questa pagina è in produzione e ha fatto squillare un iPhone
+    con iOS 18.7: cinque notifiche su cinque, di cui tre ad app chiusa.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

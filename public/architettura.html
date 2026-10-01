@@ -1,0 +1,1111 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PWA con notifiche push — architettura e istruzioni</title>
+<meta name="description" content="Come è fatta questa PWA con notifiche push su iOS e Android, e che cosa serve sapere per costruirne un'altra: vincoli, architettura, codice essenziale, trappole e ordine di lavoro.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f5f7fc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icone/icona-192.png" type="image/png">
+<link rel="stylesheet" href="/architettura.css">
+</head>
+<body>
+<a class="salta" href="#principale">Salta al contenuto</a>
+
+<div class="guscio">
+
+<header class="testata">
+  <p class="briciole">Banco di prova · pwa.example.com</p>
+  <h1>PWA con notifiche push:<br>architettura e istruzioni</h1>
+  <p class="sommario">
+    Questo documento è il verbale di un esperimento riuscito, scritto per essere
+    riusato. La prima metà spiega com'è fatta questa applicazione. La seconda è
+    <strong>quello che direi a un'intelligenza artificiale incaricata di costruirne
+    un'altra</strong>: i vincoli che non si negoziano, il codice che conta, le
+    trappole che fanno perdere giorni e l'ordine in cui conviene lavorare.
+  </p>
+  <ul class="meta">
+    <li>Verificato su iPhone · iOS 18.7 · Safari 26.6</li>
+    <li>Node + Express, 3 dipendenze</li>
+    <li>118 test automatici</li>
+    <li>Aggiornato al 1° ottobre 2026</li>
+  </ul>
+</header>
+
+<nav class="indice" aria-label="Indice">
+  <h2>Indice</h2>
+  <ol>
+    <li><a href="#vincoli">Il vincolo che decide tutto</a></li>
+    <li><a href="#requisiti">I cinque requisiti</a></li>
+    <li><a href="#architettura">L'architettura</a></li>
+    <li><a href="#notizie">Il sito notizie</a></li>
+    <li><a href="#ciclo">Il ciclo di una notifica</a></li>
+    <li><a href="#codice">Il codice che conta</a></li>
+    <li><a href="#installazione">Guidare l'installazione</a></li>
+    <li><a href="#link">I link nell'app installata</a></li>
+    <li><a href="#misura">L'apparato di misura</a></li>
+    <li><a href="#sicurezza">Sicurezza</a></li>
+    <li><a href="#trappole">Le trappole</a></li>
+    <li><a href="#ordine">Ordine di lavoro</a></li>
+    <li><a href="#esiti">Gli esiti misurati</a></li>
+    <li><a href="#fonti">Fonti</a></li>
+  </ol>
+</nav>
+
+<main id="principale">
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="vincoli">
+  <h2><span class="numero">1</span>Il vincolo che decide tutto</h2>
+  <p class="occhiello-sez">
+    Va letto prima di qualunque riga di codice, perché riscrive il progetto.
+  </p>
+
+  <p>
+    Su iOS il Web Push funziona <strong>solo</strong> dentro una web app aggiunta
+    alla schermata Home, da iOS 16.4 in poi. Mai in Safari. Su Android funziona
+    anche nel browser.
+  </p>
+
+  <div class="nota pericolo">
+    <span class="capo">Il modo in cui fallisce</span>
+    <p>
+      Il Web Push non dà errori. Nessuna eccezione in console, nessun codice di
+      stato sbagliato, nessun avviso: semplicemente la notifica non arriva.
+      Un test verde, un <code>curl</code> che risponde <code>201</code> e un
+      service worker registrato <strong>non dimostrano nulla</strong> sul fatto che
+      il telefono squilli. Questo è il motivo per cui questo progetto ha un
+      registro degli eventi — vedi la sezione&nbsp;9.
+    </p>
+  </div>
+
+  <p>Da questo discendono tre conseguenze che non si aggirano:</p>
+  <ul>
+    <li>serve <strong>HTTPS con certificato valido</strong> — un autofirmato non basta,
+      su iOS impedisce anche l'installazione;</li>
+    <li>su iOS il pulsante «attiva notifiche» va <strong>spento finché l'app non è
+      installata</strong>, altrimenti l'utente tocca e non succede niente — e impara
+      che l'app è rotta;</li>
+    <li><code>Notification.requestPermission()</code> deve partire da un
+      <strong>gesto dell'utente</strong>: un <code>await</code> che lo preceda rompe il
+      legame col tocco e su iOS la richiesta viene ignorata in silenzio.</li>
+  </ul>
+
+  <h3>Cosa non si può fare, e non si potrà a breve</h3>
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Desiderio</th><th>Realtà</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Installare la PWA con una chiamata di codice su iPhone</td>
+          <td><span class="no">Impossibile.</span> <code>navigator.install()</code> è
+            Chromium e su iOS ogni browser è WebKit. Chi promette «installazione
+            automatica su iPhone» sta descrivendo Android.</td>
+        </tr>
+        <tr>
+          <td>Sapere da Safari se la PWA è già installata</td>
+          <td><span class="no">Impossibile.</span> <code>getInstalledRelatedApps()</code>
+            è solo Chromium, e la web app installata ha un <strong>contenitore dati
+            separato</strong> da Safari: non funziona neanche il trucco di lasciare un
+            segno in <code>localStorage</code>.</td>
+        </tr>
+        <tr>
+          <td>Far aprire un link nella PWA installata su iPhone</td>
+          <td><span class="no">Impossibile.</span> Ogni link va al browser predefinito.
+            Le uniche due cose che aprono una web app su iOS sono la sua icona e il
+            tocco su una notifica push.</td>
+        </tr>
+        <tr>
+          <td>Sapere che l'utente ha installato, su iOS</td>
+          <td><span class="no">Nessun evento.</span> <code>appinstalled</code> non
+            esiste. L'unico segnale è vedere la pagina ripartire in
+            <code>display-mode: standalone</code>.</td>
+        </tr>
+        <tr>
+          <td>Installazione in un tocco su Android</td>
+          <td><span class="si">Sì.</span> <code>beforeinstallprompt</code> funziona e va
+            intercettato.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="requisiti">
+  <h2><span class="numero">2</span>I cinque requisiti</h2>
+  <p class="occhiello-sez">
+    Se ne manca <strong>uno solo</strong>, non arriva niente — e senza errori.
+  </p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>#</th><th>Requisito</th><th>Se manca</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>HTTPS con certificato valido</strong> (o <code>localhost</code>)</td>
+          <td>Il service worker non si registra affatto.</td></tr>
+        <tr><td>2</td><td><strong>Manifest</strong> con <code>display: standalone</code> o <code>fullscreen</code></td>
+          <td>iOS non la tratta come web app: niente installazione, niente push.</td></tr>
+        <tr><td>3</td><td><strong>Service worker servito dalla radice</strong></td>
+          <td>Da <code>/js/sw.js</code> il suo raggio d'azione sarebbe solo <code>/js/</code>.</td></tr>
+        <tr><td>4</td><td><strong>Permesso chiesto da un tocco</strong></td>
+          <td>La richiesta viene ignorata senza dire nulla.</td></tr>
+        <tr><td>5</td><td><strong>Su iOS: app aggiunta alla Home</strong></td>
+          <td>In Safari il pulsante non farà mai nulla.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota pericolo">
+    <span class="capo">La regola che costa l'iscrizione</span>
+    <p>
+      <strong>Ogni evento <code>push</code> deve concludersi con una notifica
+      visibile.</strong> Se il service worker non chiama <code>showNotification()</code>,
+      Safari <strong>revoca l'iscrizione</strong> e Chrome mostra al posto tuo
+      «questo sito è stato aggiornato in background». Non è una raccomandazione di
+      stile: è il patto in cambio del quale il browser permette a un server remoto
+      di svegliare il telefono.
+    </p>
+    <p>
+      Conseguenza pratica: nel gestore <code>push</code> <strong>nessun ramo</strong>
+      può uscire senza mostrare qualcosa — nemmeno quello del payload illeggibile,
+      nemmeno il push senza corpo, che è legittimo e capita.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="architettura">
+  <h2><span class="numero">3</span>L'architettura</h2>
+  <p class="occhiello-sez">
+    Nessun servizio terzo, nessun SDK, tre dipendenze in tutto.
+  </p>
+
+  <div class="diagramma">
+    <svg viewBox="0 0 820 360" role="img" aria-label="Diagramma: il browser parla con Caddy, che inoltra al processo Node; Node firma con VAPID e consegna a FCM o APNs, che recapitano al dispositivo; il service worker mostra la notifica e riferisce al registro.">
+      <defs>
+        <marker id="p" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" class="d-punta"/>
+        </marker>
+      </defs>
+
+      <rect x="16" y="28" width="168" height="74" rx="12" class="d-scatola-forte"/>
+      <text x="100" y="58" text-anchor="middle" class="d-testo">Dispositivo</text>
+      <text x="100" y="77" text-anchor="middle" class="d-piccolo">pagina + service worker</text>
+
+      <rect x="272" y="28" width="150" height="74" rx="12" class="d-scatola"/>
+      <text x="347" y="58" text-anchor="middle" class="d-testo">Caddy</text>
+      <text x="347" y="77" text-anchor="middle" class="d-piccolo">TLS automatico :443</text>
+
+      <rect x="510" y="28" width="180" height="74" rx="12" class="d-scatola"/>
+      <text x="600" y="53" text-anchor="middle" class="d-testo">Node + Express</text>
+      <text x="600" y="71" text-anchor="middle" class="d-piccolo">127.0.0.1:3020</text>
+      <text x="600" y="87" text-anchor="middle" class="d-piccolo">solo loopback</text>
+
+      <line x1="184" y1="65" x2="264" y2="65" class="d-freccia" marker-end="url(#p)"/>
+      <text x="224" y="55" text-anchor="middle" class="d-etichetta">HTTPS</text>
+      <line x1="422" y1="65" x2="502" y2="65" class="d-freccia" marker-end="url(#p)"/>
+      <text x="462" y="55" text-anchor="middle" class="d-etichetta">proxy</text>
+
+      <rect x="510" y="150" width="180" height="66" rx="12" class="d-scatola"/>
+      <text x="600" y="176" text-anchor="middle" class="d-testo">web-push</text>
+      <text x="600" y="195" text-anchor="middle" class="d-piccolo">firma VAPID + cifra</text>
+      <line x1="600" y1="102" x2="600" y2="142" class="d-freccia" marker-end="url(#p)"/>
+
+      <rect x="272" y="150" width="150" height="66" rx="12" class="d-scatola"/>
+      <text x="347" y="176" text-anchor="middle" class="d-testo">FCM · APNs</text>
+      <text x="347" y="195" text-anchor="middle" class="d-piccolo">Google · Apple</text>
+      <line x1="502" y1="183" x2="430" y2="183" class="d-freccia" marker-end="url(#p)"/>
+      <text x="466" y="173" text-anchor="middle" class="d-etichetta">POST</text>
+
+      <rect x="16" y="150" width="168" height="66" rx="12" class="d-scatola-ok"/>
+      <text x="100" y="176" text-anchor="middle" class="d-testo">La notifica</text>
+      <text x="100" y="195" text-anchor="middle" class="d-piccolo">anche ad app chiusa</text>
+      <line x1="264" y1="183" x2="192" y2="183" class="d-freccia" marker-end="url(#p)"/>
+
+      <rect x="272" y="268" width="418" height="62" rx="12" class="d-scatola"/>
+      <text x="481" y="293" text-anchor="middle" class="d-testo">Registro degli eventi</text>
+      <text x="481" y="312" text-anchor="middle" class="d-piccolo">il dispositivo riferisce: «l'ho mostrata, dopo N secondi»</text>
+      <path d="M100 216 L100 299 L264 299" class="d-tratteggio" marker-end="url(#p)"/>
+      <text x="150" y="290" class="d-etichetta">/api/annota</text>
+      <path d="M690 65 L742 65 L742 299 L698 299" class="d-tratteggio" marker-end="url(#p)"/>
+      <text x="748" y="185" class="d-etichetta">invii</text>
+    </svg>
+  </div>
+
+  <div class="nota">
+    <span class="capo">La linea tratteggiata è il punto</span>
+    <p>
+      Il server sa soltanto di aver <em>consegnato</em> a Google o ad Apple. Solo il
+      <strong>dispositivo</strong> sa se la notifica è comparsa su uno schermo. Sono
+      due fatti diversi, e confonderli significa dichiarare riuscita una prova in
+      cui il telefono non ha mai squillato.
+    </p>
+  </div>
+
+  <h3>I pezzi, e perché sono lì</h3>
+  <div class="tabella">
+    <table>
+      <thead><tr><th>File</th><th>Ruolo</th><th>Perché così</th></tr></thead>
+      <tbody>
+        <tr><td><code>server.js</code></td><td>statici + API</td>
+          <td>Ascolta solo su <code>127.0.0.1</code>: da fuori si arriva unicamente passando dal reverse proxy.</td></tr>
+        <tr><td><code>sw.js</code></td><td>service worker</td>
+          <td><strong>Nella radice</strong>, non in <code>public/</code>: lo scope non può risalire sopra la cartella da cui è stato scaricato.</td></tr>
+        <tr><td><code>lib/iscrizioni.js</code></td><td>archivio dispositivi</td>
+          <td>File JSON con scrittura atomica. Un database qui aggiungerebbe un servizio da tenere vivo senza risolvere nulla.</td></tr>
+        <tr><td><code>lib/registro.js</code></td><td>verbale eventi</td>
+          <td>JSONL: si aggiunge in coda senza rileggere, e una scrittura interrotta perde al massimo una riga.</td></tr>
+        <tr><td><code>lib/utenti.js</code> · <code>lib/sessione.js</code></td><td>utenti e accesso</td>
+          <td>Password scrypt, cookie firmato senza archivio delle sessioni, revoca per versione.</td></tr>
+        <tr><td><code>lib/notizie.js</code> · <code>lib/pianificatore.js</code></td><td>feed e riepiloghi</td>
+          <td>Ogni feed isolato: uno che fallisce non ferma gli altri, e l'esito resta registrato.</td></tr>
+        <tr><td><code>componente/pwa-invito.js</code></td><td>invito all'installazione</td>
+          <td>Fuori da <code>public/</code> di proposito: è il pezzo pensato per essere copiato altrove, e la separazione impedisce che si intrecci col resto.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Le dipendenze</h3>
+  <p>
+    Tre: <code>express</code>, <code>web-push</code> e <code>fast-xml-parser</code>
+    (per i feed RSS: un parser fatto di espressioni regolari sarebbe stato una
+    scorciatoia fragile). Nessun Firebase, nessun SDK,
+    nessun account terzo. Le icone sono generate da uno script che scrive i PNG a
+    mano con <code>zlib</code> — sul server non c'erano né ImageMagick né PIL, e
+    aggiungere una libreria di immagini per disegnare una campanella sarebbe stato
+    sproporzionato.
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="notizie">
+  <h2><span class="numero">4</span>Il sito notizie multiutente</h2>
+  <p class="occhiello-sez">
+    La fase 3: notizie vere, utenti veri, e ognuno sceglie cosa ricevere e quanto spesso.
+  </p>
+
+  <div class="diagramma">
+    <svg viewBox="0 0 820 300" role="img" aria-label="Sette feed RSS vengono letti ogni cinque minuti e finiscono in un archivio deduplicato. Un pianificatore, una volta al minuto, confronta l'archivio con la griglia di ogni utente e, solo se c'è del nuovo, manda una notifica raggruppata a tutti i dispositivi di quell'utente.">
+      <defs>
+        <marker id="n" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" class="d-punta"/></marker>
+        <marker id="nok" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" class="d-punta-ok"/></marker>
+      </defs>
+      <rect x="14" y="30" width="210" height="80" rx="12" class="d-scatola"/>
+      <text x="119" y="64" text-anchor="middle" class="d-testo">7 feed RSS</text>
+      <text x="119" y="83" text-anchor="middle" class="d-piccolo">ANSA · Repubblica · Sole 24 Ore</text>
+      <rect x="300" y="30" width="210" height="80" rx="12" class="d-scatola"/>
+      <text x="405" y="64" text-anchor="middle" class="d-testo">Archivio notizie</text>
+      <text x="405" y="83" text-anchor="middle" class="d-piccolo">deduplica per link · 7 giorni</text>
+      <rect x="592" y="30" width="214" height="80" rx="12" class="d-scatola-forte"/>
+      <text x="699" y="64" text-anchor="middle" class="d-testo">Pianificatore</text>
+      <text x="699" y="83" text-anchor="middle" class="d-piccolo">un giro al minuto</text>
+      <rect x="592" y="196" width="214" height="80" rx="12" class="d-scatola"/>
+      <text x="699" y="230" text-anchor="middle" class="d-testo">Griglia di ogni utente</text>
+      <text x="699" y="249" text-anchor="middle" class="d-piccolo">categoria × frequenza</text>
+      <rect x="300" y="196" width="210" height="80" rx="12" class="d-scatola-ok"/>
+      <text x="405" y="230" text-anchor="middle" class="d-testo">Una notifica per giro</text>
+      <text x="405" y="249" text-anchor="middle" class="d-piccolo">le categorie in scadenza, insieme</text>
+      <rect x="14" y="196" width="210" height="80" rx="12" class="d-scatola-forte"/>
+      <text x="119" y="230" text-anchor="middle" class="d-testo">I dispositivi dell'utente</text>
+      <text x="119" y="249" text-anchor="middle" class="d-piccolo">tutti i suoi, e solo i suoi</text>
+
+      <line x1="224" y1="70" x2="292" y2="70" class="d-freccia" marker-end="url(#n)"/>
+      <text x="258" y="60" text-anchor="middle" class="d-etichetta">ogni 5 min</text>
+      <line x1="510" y1="70" x2="584" y2="70" class="d-freccia" marker-end="url(#n)"/>
+      <text x="547" y="60" text-anchor="middle" class="d-etichetta">le nuove</text>
+      <line x1="740" y1="196" x2="740" y2="118" class="d-freccia" marker-end="url(#n)"/>
+      <text x="748" y="160" class="d-etichetta">quando</text>
+      <path d="M640 110 L640 156 L405 156 L405 188" class="d-freccia" marker-end="url(#n)"/>
+      <text x="522" y="148" text-anchor="middle" class="d-etichetta">solo se c'è del nuovo</text>
+      <line x1="300" y1="236" x2="232" y2="236" class="d-freccia-ok" marker-end="url(#nok)"/>
+    </svg>
+  </div>
+  <p class="didascalia">
+    «Nuova» vuol dire vista per la prima volta da questo server, non la data del
+    feed: le date dei feed sono inaffidabili, il momento in cui l'abbiamo vista noi
+    è un fatto.
+  </p>
+
+  <h3>La griglia</h3>
+  <p>
+    Ogni utente sceglie, <strong>per ogni categoria</strong> — politica, mercati
+    finanziari, sport, guerre e macroeconomia — una frequenza fra: no, 5 minuti,
+    ogni ora, ogni giorno, ogni settimana. Tre regole la rendono sopportabile:
+  </p>
+  <ul>
+    <li><strong>La frequenza è un massimo.</strong> Se nell'intervallo non è uscito
+      niente, non parte niente: una notifica vuota insegna a ignorarle tutte.</li>
+    <li><strong>Una notifica per giro.</strong> Le categorie che scadono insieme
+      partono in un solo messaggio («4 notizie per te», una riga per categoria).
+      Con tutto a 5 minuti, altrimenti, sarebbero quattro notifiche ogni cinque
+      minuti.</li>
+    <li><strong>Cambiare frequenza riparte da adesso.</strong> Passare da
+      «settimana» a «5 minuti» non scarica una settimana di arretrati.</li>
+  </ul>
+
+  <h3>Utenti e accesso</h3>
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Momento</th><th>Cosa succede</th></tr></thead>
+      <tbody>
+        <tr><td>Creazione</td><td>Solo l'amministratore, da <code>/admin</code> o dal terminale. Il server genera una password iniziale che si vede <strong>una volta</strong>.</td></tr>
+        <tr><td>Primo accesso</td><td>Con la password iniziale si può fare una cosa sola: cambiarla. Finché non succede, il pianificatore ignora l'account.</td></tr>
+        <tr><td>Sessione</td><td>Cookie firmato HMAC, <code>HttpOnly; Secure; SameSite=Lax</code>, 30 giorni. Porta una <em>versione</em>: cambiando password la versione sale e i cookie emessi prima smettono di valere ovunque.</td></tr>
+        <tr><td>Iscrizione push</td><td>Il dispositivo è dell'utente <strong>della sessione</strong>, mai di quello dichiarato dalla pagina.</td></tr>
+        <tr><td>Uscita</td><td>Il server toglie <strong>tutti</strong> i dispositivi dell'utente: chi ha il telefono dopo di lui non riceve le sue notizie.</td></tr>
+        <tr><td>Ruolo admin</td><td>Si assegna solo dal terminale: una sessione admin rubata potrebbe creare utenti, non altri amministratori.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="ciclo">
+  <h2><span class="numero">5</span>Il ciclo di una notifica</h2>
+  <p class="occhiello-sez">Dove si rompe, e chi se ne accorge.</p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>#</th><th>Passo</th><th>Chi lo sa</th><th>Se si ferma qui</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>La pagina registra il service worker</td><td>pagina</td>
+          <td>HTTPS mancante, o file servito dal posto sbagliato.</td></tr>
+        <tr><td>2</td><td>L'utente tocca e concede il permesso</td><td>pagina</td>
+          <td>Se risponde <em>no</em> è <strong>definitivo</strong>: il browser non richiederà più.</td></tr>
+        <tr><td>3</td><td><code>pushManager.subscribe()</code> con la chiave VAPID</td><td>pagina</td>
+          <td>Chiave non convertita da base64url a <code>Uint8Array</code>.</td></tr>
+        <tr><td>4</td><td>Il server salva l'iscrizione</td><td>server</td>
+          <td>Nulla da segnalare: è la parte facile.</td></tr>
+        <tr><td>5</td><td>Il server firma e consegna a FCM/APNs</td><td>server</td>
+          <td><code>403</code> = chiavi diverse. <code>410</code> = iscrizione morta.</td></tr>
+        <tr><td>6</td><td><strong>Il service worker mostra la notifica</strong></td><td><strong>dispositivo</strong></td>
+          <td>Telefono offline, o notifiche silenziate per quell'app.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota attenzione">
+    <span class="capo">Il salto di conoscenza fra 5 e 6</span>
+    <p>
+      Fra il passo 5 e il passo 6 il server smette di sapere qualcosa. Se
+      l'applicazione non fa dire al dispositivo «l'ho mostrata», quel confine
+      resta buio per sempre e ogni diagnosi diventa un'ipotesi. È tutta qui la
+      ragione d'essere della sezione&nbsp;9.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="codice">
+  <h2><span class="numero">6</span>Il codice che conta</h2>
+  <p class="occhiello-sez">
+    Il minimo indispensabile, con i commenti che spiegano perché non si può
+    togliere niente.
+  </p>
+
+  <h3>Il manifest</h3>
+  <p class="titolo-codice">manifest.webmanifest</p>
+<pre translate="no"><code>{
+  <span class="c-nome">"id"</span>: <span class="c-stringa">"/"</span>,
+  <span class="c-nome">"name"</span>: <span class="c-stringa">"Nome completo"</span>,
+  <span class="c-nome">"short_name"</span>: <span class="c-stringa">"Nome"</span>,
+  <span class="c-nome">"start_url"</span>: <span class="c-stringa">"/?fonte=pwa"</span>,
+  <span class="c-nome">"scope"</span>: <span class="c-stringa">"/"</span>,
+  <span class="c-commento">// standalone o fullscreen: con "browser" iOS non la installa come web app</span>
+  <span class="c-nome">"display"</span>: <span class="c-stringa">"standalone"</span>,
+  <span class="c-nome">"background_color"</span>: <span class="c-stringa">"#1e3a8a"</span>,
+  <span class="c-nome">"theme_color"</span>: <span class="c-stringa">"#1e3a8a"</span>,
+  <span class="c-commento">// 192 e 512 sono il minimo per l'installabilita'; maskable evita che</span>
+  <span class="c-commento">// Android incornici l'icona in un quadrato bianco</span>
+  <span class="c-nome">"icons"</span>: [
+    { <span class="c-nome">"src"</span>: <span class="c-stringa">"/icone/192.png"</span>, <span class="c-nome">"sizes"</span>: <span class="c-stringa">"192x192"</span>, <span class="c-nome">"type"</span>: <span class="c-stringa">"image/png"</span>, <span class="c-nome">"purpose"</span>: <span class="c-stringa">"any"</span> },
+    { <span class="c-nome">"src"</span>: <span class="c-stringa">"/icone/512.png"</span>, <span class="c-nome">"sizes"</span>: <span class="c-stringa">"512x512"</span>, <span class="c-nome">"type"</span>: <span class="c-stringa">"image/png"</span>, <span class="c-nome">"purpose"</span>: <span class="c-stringa">"any"</span> },
+    { <span class="c-nome">"src"</span>: <span class="c-stringa">"/icone/512m.png"</span>, <span class="c-nome">"sizes"</span>: <span class="c-stringa">"512x512"</span>, <span class="c-nome">"type"</span>: <span class="c-stringa">"image/png"</span>, <span class="c-nome">"purpose"</span>: <span class="c-stringa">"maskable"</span> }
+  ],
+  <span class="c-commento">// i link dentro lo scope vanno all'app installata (dove la piattaforma lo permette)</span>
+  <span class="c-nome">"handle_links"</span>: <span class="c-stringa">"preferred"</span>,
+  <span class="c-nome">"launch_handler"</span>: { <span class="c-nome">"client_mode"</span>: <span class="c-stringa">"navigate-existing"</span> }
+}</code></pre>
+
+  <div class="nota attenzione">
+    <span class="capo">iOS ignora il manifest per l'icona</span>
+    <p>
+      Serve anche <code>&lt;link rel="apple-touch-icon" href="/icone/180.png"&gt;</code>,
+      e quell'immagine dev'essere <strong>opaca</strong>: iOS applica la sua maschera e
+      una trasparenza diventa nero. Serve inoltre
+      <code>&lt;meta name="viewport" content="…, viewport-fit=cover"&gt;</code> con le
+      <code>env(safe-area-inset-*)</code> nel CSS, altrimenti in modalità app il
+      contenuto finisce sotto il notch.
+    </p>
+  </div>
+
+  <h3>Il gestore push — il pezzo più delicato</h3>
+  <p class="titolo-codice">sw.js</p>
+<pre translate="no"><code><span class="c-nome">self</span>.<span class="c-chiave">addEventListener</span>(<span class="c-stringa">'push'</span>, (event) => {
+  <span class="c-chiave">let</span> dati = {};
+  <span class="c-chiave">try</span> {
+    <span class="c-commento">// event.data e' null se il push arriva senza payload: succede, ed e'</span>
+    <span class="c-commento">// uno dei casi in cui la notifica va mostrata lo stesso.</span>
+    dati = event.data ? event.data.<span class="c-chiave">json</span>() : {};
+  } <span class="c-chiave">catch</span> (e) {
+    <span class="c-chiave">try</span> { dati = { testo: event.data.<span class="c-chiave">text</span>() }; } <span class="c-chiave">catch</span> (e2) { dati = {}; }
+  }
+
+  <span class="c-commento">// waitUntil e' OBBLIGATORIO: senza, il browser puo' terminare il service</span>
+  <span class="c-commento">// worker prima che showNotification() abbia finito, e la notifica sparisce.</span>
+  event.<span class="c-chiave">waitUntil</span>(
+    <span class="c-nome">self</span>.registration.<span class="c-chiave">showNotification</span>(dati.titolo || <span class="c-stringa">'Notifica'</span>, {
+      body: dati.testo || <span class="c-stringa">'Notifica ricevuta.'</span>,
+      icon: <span class="c-stringa">'/icone/192.png'</span>,
+      badge: <span class="c-stringa">'/icone/192.png'</span>,
+      tag: <span class="c-stringa">'prova'</span>, renotify: <span class="c-chiave">true</span>,
+      data: { url: dati.url || <span class="c-stringa">'/'</span> },
+    })
+  );
+});</code></pre>
+
+  <div class="nota buona">
+    <span class="capo">Come si prova davvero questo gestore</span>
+    <p>
+      Non leggendone il sorgente in cerca di <code>return</code> anticipati: quello è
+      una supposizione. Si <strong>esegue</strong> il service worker in un ambiente
+      finto (<code>node:vm</code> con <code>self</code>, <code>caches</code> e
+      <code>fetch</code> simulati) e gli si mandano cinque payload: JSON completo,
+      JSON vuoto, testo non JSON, payload illeggibile, <strong>push senza corpo</strong>.
+      Per ognuno si verifica che <code>showNotification</code> sia stata chiamata
+      esattamente una volta. È un esperimento, non un'ispezione.
+    </p>
+  </div>
+
+  <h3>Iscrizione, lato pagina</h3>
+  <p class="titolo-codice">app.js</p>
+<pre translate="no"><code><span class="c-commento">// La chiave VAPID viaggia in base64url (- e _ al posto di + e /, senza =);</span>
+<span class="c-commento">// subscribe() vuole un Uint8Array. Senza questa conversione fallisce</span>
+<span class="c-commento">// senza un messaggio utile, ed e' l'errore piu' comune in assoluto.</span>
+<span class="c-chiave">function</span> <span class="c-nome">base64UrlToUint8Array</span>(s) {
+  <span class="c-chiave">const</span> pad = <span class="c-stringa">'='</span>.<span class="c-chiave">repeat</span>((<span class="c-numero">4</span> - (s.length % <span class="c-numero">4</span>)) % <span class="c-numero">4</span>);
+  <span class="c-chiave">const</span> b64 = (s + pad).<span class="c-chiave">replace</span>(/-/g, <span class="c-stringa">'+'</span>).<span class="c-chiave">replace</span>(/_/g, <span class="c-stringa">'/'</span>);
+  <span class="c-chiave">const</span> grezzo = <span class="c-chiave">atob</span>(b64);
+  <span class="c-chiave">return</span> <span class="c-nome">Uint8Array</span>.<span class="c-chiave">from</span>(grezzo, (c) => c.<span class="c-chiave">charCodeAt</span>(<span class="c-numero">0</span>));
+}
+
+<span class="c-nome">btnAttiva</span>.<span class="c-chiave">addEventListener</span>(<span class="c-stringa">'click'</span>, <span class="c-chiave">async</span> () => {
+  <span class="c-commento">// Da un TOCCO, e senza await prima: un'attesa qui rompe il legame col</span>
+  <span class="c-commento">// gesto e su iOS la richiesta viene ignorata in silenzio.</span>
+  <span class="c-chiave">const</span> permesso = <span class="c-chiave">await</span> <span class="c-nome">Notification</span>.<span class="c-chiave">requestPermission</span>();
+  <span class="c-chiave">if</span> (permesso !== <span class="c-stringa">'granted'</span>) <span class="c-chiave">return</span>;
+
+  <span class="c-commento">// ready attende un worker ATTIVO: register() da solo puo' restituirne uno</span>
+  <span class="c-commento">// ancora in installazione, e subscribe() su quello fallisce senza dire perche'.</span>
+  <span class="c-chiave">const</span> reg = <span class="c-chiave">await</span> <span class="c-nome">navigator</span>.serviceWorker.ready;
+
+  <span class="c-commento">// Su iPhone in Safari (app NON installata) pushManager non esiste affatto.</span>
+  <span class="c-commento">// Non e' un guasto: e' il modello di Apple, ed e' il caso piu' frequente.</span>
+  <span class="c-chiave">if</span> (!reg.pushManager) <span class="c-chiave">return</span>;
+
+  <span class="c-chiave">const</span> { chiave } = <span class="c-chiave">await</span> (<span class="c-chiave">await</span> <span class="c-chiave">fetch</span>(<span class="c-stringa">'/api/chiave-pubblica'</span>)).<span class="c-chiave">json</span>();
+  <span class="c-chiave">const</span> sub = <span class="c-chiave">await</span> reg.pushManager.<span class="c-chiave">subscribe</span>({
+    userVisibleOnly: <span class="c-chiave">true</span>,  <span class="c-commento">// obbligatorio su Chrome, e coerente con la regola</span>
+    applicationServerKey: <span class="c-nome">base64UrlToUint8Array</span>(chiave),
+  });
+
+  <span class="c-chiave">await</span> <span class="c-chiave">fetch</span>(<span class="c-stringa">'/api/iscrivi'</span>, {
+    method: <span class="c-stringa">'POST'</span>,
+    headers: { <span class="c-stringa">'Content-Type'</span>: <span class="c-stringa">'application/json'</span> },
+    body: <span class="c-nome">JSON</span>.<span class="c-chiave">stringify</span>({ iscrizione: sub.<span class="c-chiave">toJSON</span>() }),
+  });
+});</code></pre>
+
+  <h3>Invio, lato server</h3>
+  <p class="titolo-codice">server.js</p>
+<pre translate="no"><code><span class="c-chiave">const</span> webpush = <span class="c-chiave">require</span>(<span class="c-stringa">'web-push'</span>);
+<span class="c-commento">// Il soggetto dev'essere un mailto: o un https: veri: identifica chi gestisce</span>
+<span class="c-commento">// il servizio verso Google e Apple.</span>
+webpush.<span class="c-chiave">setVapidDetails</span>(SOGGETTO, CHIAVE_PUBBLICA, CHIAVE_PRIVATA);
+
+<span class="c-chiave">async function</span> <span class="c-nome">spedisci</span>(voce, carico) {
+  <span class="c-chiave">try</span> {
+    <span class="c-commento">// TTL 24h: una notifica piu' vecchia di un giorno non interessa piu' a</span>
+    <span class="c-commento">// nessuno, e il servizio push puo' smettere di riprovare.</span>
+    <span class="c-chiave">await</span> webpush.<span class="c-chiave">sendNotification</span>(
+      { endpoint: voce.endpoint, keys: voce.keys }, carico,
+      { TTL: <span class="c-numero">86400</span>, urgency: <span class="c-stringa">'high'</span> }
+    );
+    <span class="c-chiave">return</span> { ok: <span class="c-chiave">true</span> };
+  } <span class="c-chiave">catch</span> (e) {
+    <span class="c-commento">// 404/410 = quell'iscrizione non esiste piu' (app disinstallata, permesso</span>
+    <span class="c-commento">// revocato). Vanno CANCELLATE: e' l'unico modo che il protocollo offre per</span>
+    <span class="c-commento">// sapere che un dispositivo se n'e' andato. Chi non lo fa accumula invii</span>
+    <span class="c-commento">// falliti per sempre.</span>
+    <span class="c-chiave">if</span> (e.statusCode === <span class="c-numero">404</span> || e.statusCode === <span class="c-numero">410</span>) <span class="c-nome">iscrizioni</span>.<span class="c-chiave">rimuovi</span>(voce.endpoint);
+    <span class="c-chiave">return</span> { ok: <span class="c-chiave">false</span>, stato: e.statusCode };
+  }
+}</code></pre>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Codice</th><th>Significa</th><th>Cosa fare</th></tr></thead>
+      <tbody>
+        <tr><td><code>201</code></td><td>consegnata al servizio push</td><td>Non significa «arrivata».</td></tr>
+        <tr><td><code>403</code></td><td>chiavi VAPID non corrispondenti</td><td>L'iscrizione è stata fatta con un'altra coppia: va rifatta dal dispositivo.</td></tr>
+        <tr><td><code>404</code> · <code>410</code></td><td>iscrizione morta</td><td><strong>Cancellarla</strong> dall'archivio.</td></tr>
+        <tr><td><code>413</code></td><td>payload troppo grande</td><td>Restare sotto ~4 kB.</td></tr>
+        <tr><td><code>429</code></td><td>troppe richieste</td><td>Rallentare e riprovare.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Servire il service worker</h3>
+  <p class="titolo-codice">server.js</p>
+<pre translate="no"><code>app.<span class="c-chiave">get</span>(<span class="c-stringa">'/sw.js'</span>, (req, res) => {
+  res.<span class="c-chiave">set</span>({
+    <span class="c-stringa">'Content-Type'</span>: <span class="c-stringa">'application/javascript; charset=utf-8'</span>,
+    <span class="c-commento">// Senza questo il browser puo' servire per ore un worker vecchio, e una</span>
+    <span class="c-commento">// correzione al gestore push sembrerebbe non avere alcun effetto.</span>
+    <span class="c-stringa">'Cache-Control'</span>: <span class="c-stringa">'no-cache, max-age=0'</span>,
+    <span class="c-stringa">'Service-Worker-Allowed'</span>: <span class="c-stringa">'/'</span>,
+  });
+  res.<span class="c-chiave">sendFile</span>(path.<span class="c-chiave">join</span>(__dirname, <span class="c-stringa">'sw.js'</span>));
+});</code></pre>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="installazione">
+  <h2><span class="numero">7</span>Guidare l'installazione</h2>
+  <p class="occhiello-sez">
+    Su iPhone non si può automatizzare. Si può però rendere il gesto ovvio.
+  </p>
+
+  <p>
+    Esistono due librerie mature — <code>@khmyznikov/pwa-install</code> e
+    <code>philfung/add-to-homescreen</code>, entrambe MIT. Qui è stato scritto un
+    componente proprio, per una ragione precisa: <strong>entrambe si fermano
+    all'installazione</strong>, mentre il percorso vero è <em>installa → concedi il
+    permesso</em>, e su iPhone il secondo esiste solo dopo il primo. Una libreria che
+    copre metà del problema va comunque estesa.
+  </p>
+  <p>Ne sono state prese però le decisioni, che valgono più del codice:</p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Decisione</th><th>Perché</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Freccia animata</strong> verso il pulsante Condividi</td>
+          <td>L'unica scelta d'interfaccia per cui esista un'affermazione sui tassi di
+            installazione. Sposta il problema da «leggi e capisci» a «guarda dove indica».
+            Su iPhone la barra è in basso, su iPad in alto a destra.</td></tr>
+        <tr><td><strong>Browser in-app riconosciuti per primi</strong></td>
+          <td>Instagram, Facebook, WhatsApp, X, TikTok, LinkedIn sono la sorgente di
+            traffico più comune da social ed <em>esattamente</em> quelli in cui installare è
+            impossibile: non hanno la voce «Aggiungi a Home». È il caso più trascurato.</td></tr>
+        <tr><td><strong>Due livelli di rifiuto</strong></td>
+          <td>«Non ora» (7 giorni) e «non mostrarmelo più», con un modo discreto per
+            riaccenderlo: una scelta definitiva senza ripensamento non è rispetto, è un
+            vicolo cieco.</td></tr>
+        <tr><td><strong>Foglio dal basso</strong>, non banner a mezza pagina</td>
+          <td>È la forma che gli utenti già conoscono, e si chiude trascinandola —
+            il primo gesto che provano.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Quale invito mostrare</h3>
+  <div class="diagramma">
+    <svg viewBox="0 0 820 610" role="img" aria-label="Albero di decisione dell'invito all'installazione: sei domande nell'ordine in cui le pone il codice, ciascuna con la sua risposta se sì, e un caso finale per i browser che non offrono l'installazione.">
+      <defs>
+        <marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" class="d-punta"/></marker>
+      </defs>
+      <rect x="14" y="14" width="360" height="54" rx="10" class="d-domanda"/>
+      <text x="30" y="38" class="d-testo">Aperta dall'app installata?</text>
+      <text x="30" y="55" class="d-piccolo">display-mode: standalone</text>
+      <rect x="450" y="14" width="356" height="54" rx="10" class="d-scatola-ok"/>
+      <text x="466" y="38" class="d-testo">Salta al permesso notifiche</text>
+      <text x="466" y="55" class="d-piccolo">è già il posto giusto</text>
+      <line x1="374" y1="41" x2="442" y2="41" class="d-freccia" marker-end="url(#a)"/>
+      <text x="402" y="34" class="d-si">sì</text>
+      <line x1="194" y1="68" x2="194" y2="94" class="d-freccia" marker-end="url(#a)"/>
+      <text x="202" y="85" class="d-no">no</text>
+      <rect x="14" y="102" width="360" height="54" rx="10" class="d-domanda"/>
+      <text x="30" y="126" class="d-testo">Risulta installata, ma sei nel browser?</text>
+      <text x="30" y="143" class="d-piccolo">getInstalledRelatedApps · solo Chromium</text>
+      <rect x="450" y="102" width="356" height="54" rx="10" class="d-scatola"/>
+      <text x="466" y="126" class="d-testo">«Ce l'hai già: aprila dall'icona»</text>
+      <text x="466" y="143" class="d-piccolo">non riproporre l'installazione</text>
+      <line x1="374" y1="129" x2="442" y2="129" class="d-freccia" marker-end="url(#a)"/>
+      <text x="402" y="122" class="d-si">sì</text>
+      <line x1="194" y1="156" x2="194" y2="182" class="d-freccia" marker-end="url(#a)"/>
+      <text x="202" y="173" class="d-no">no</text>
+      <rect x="14" y="190" width="360" height="54" rx="10" class="d-domanda"/>
+      <text x="30" y="214" class="d-testo">Browser interno di un'app?</text>
+      <text x="30" y="231" class="d-piccolo">Instagram, WhatsApp, Facebook…</text>
+      <rect x="450" y="190" width="356" height="54" rx="10" class="d-scatola"/>
+      <text x="466" y="214" class="d-testo">«Esci da Instagram»</text>
+      <text x="466" y="231" class="d-piccolo">da lì l'aggiunta a Home non esiste</text>
+      <line x1="374" y1="217" x2="442" y2="217" class="d-freccia" marker-end="url(#a)"/>
+      <text x="402" y="210" class="d-si">sì</text>
+      <line x1="194" y1="244" x2="194" y2="270" class="d-freccia" marker-end="url(#a)"/>
+      <text x="202" y="261" class="d-no">no</text>
+      <rect x="14" y="278" width="360" height="54" rx="10" class="d-domanda"/>
+      <text x="30" y="302" class="d-testo">Altro browser su iPhone?</text>
+      <rect x="450" y="278" width="356" height="54" rx="10" class="d-scatola"/>
+      <text x="466" y="302" class="d-testo">Istruzioni per quel browser</text>
+      <text x="466" y="319" class="d-piccolo">Safari come ripiego</text>
+      <line x1="374" y1="305" x2="442" y2="305" class="d-freccia" marker-end="url(#a)"/>
+      <text x="402" y="298" class="d-si">sì</text>
+      <line x1="194" y1="332" x2="194" y2="358" class="d-freccia" marker-end="url(#a)"/>
+      <text x="202" y="349" class="d-no">no</text>
+      <rect x="14" y="366" width="360" height="54" rx="10" class="d-domanda"/>
+      <text x="30" y="390" class="d-testo">Safari su iPhone o iPad?</text>
+      <text x="30" y="319" class="d-piccolo">Chrome, Edge, Firefox (iOS 16.4+)</text>
+      <rect x="450" y="366" width="356" height="54" rx="10" class="d-scatola"/>
+      <text x="466" y="390" class="d-testo">Tre passi + freccia verso Condividi</text>
+      <text x="466" y="407" class="d-piccolo">si sa dov'è il pulsante</text>
+      <line x1="374" y1="393" x2="442" y2="393" class="d-freccia" marker-end="url(#a)"/>
+      <text x="402" y="386" class="d-si">sì</text>
+      <line x1="194" y1="420" x2="194" y2="446" class="d-freccia" marker-end="url(#a)"/>
+      <text x="202" y="437" class="d-no">no</text>
+      <rect x="14" y="454" width="360" height="54" rx="10" class="d-domanda"/>
+      <text x="30" y="478" class="d-testo">Il browser offre l'installazione?</text>
+      <text x="30" y="495" class="d-piccolo">Android, desktop</text>
+      <rect x="450" y="454" width="356" height="54" rx="10" class="d-scatola-ok"/>
+      <text x="466" y="478" class="d-testo">«Installa ora»: un tocco</text>
+      <text x="466" y="495" class="d-piccolo">beforeinstallprompt</text>
+      <line x1="374" y1="481" x2="442" y2="481" class="d-freccia" marker-end="url(#a)"/>
+      <text x="402" y="474" class="d-si">sì</text>
+      <line x1="194" y1="508" x2="194" y2="534" class="d-freccia" marker-end="url(#a)"/>
+      <text x="202" y="525" class="d-no">no</text>
+      <rect x="14" y="542" width="360" height="54" rx="10" class="d-scatola"/>
+      <text x="30" y="566" class="d-testo">Dove cercarla nel menu del browser</text>
+      <text x="30" y="583" class="d-piccolo">e le notifiche funzionano anche senza installare</text>
+    </svg>
+  </div>
+  <p class="didascalia">
+    L'ordine delle domande conta: i browser in-app si riconoscono <strong>prima</strong>
+    di chiedersi se si è su iPhone, perché sono il caso più frequente da social e
+    quello in cui installare è impossibile.
+  </p>
+
+  <div class="nota attenzione">
+    <span class="capo">Correzione del 30 settembre 2026</span>
+    <p>
+      Una versione precedente di questo documento diceva che su iPhone
+      <em>solo Safari</em> può aggiungere un'app alla schermata Home.
+      <strong>È falso da iOS 16.4</strong>: le note di WebKit dicono che
+      «<em>third-party web browsers can offer “Add to Home Screen” in the Share
+      menu</em>», e Chrome, Edge, Firefox e DuckDuckGo lo fanno. Verificato su un
+      iPhone reale.
+    </p>
+    <p>
+      Quel che cambia fra Safari e gli altri non è la <em>possibilità</em> ma la
+      <strong>certezza di dove sia il pulsante</strong>: in Safari si sa, e si può
+      puntarci la freccia; negli altri il menu cambia da browser a browser e da
+      versione a versione, quindi istruzioni a parole e nessuna freccia — puntarla a
+      caso è peggio che non averla. Restano fuori solo i <strong>browser in-app</strong>,
+      che non hanno l'autorizzazione di sistema per installare.
+    </p>
+  </div>
+
+  <h3>I casi da gestire, tutti</h3>
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Situazione</th><th>Cosa mostrare</th></tr></thead>
+      <tbody>
+        <tr><td>Android / desktop con <code>beforeinstallprompt</code></td>
+          <td><span class="si">Un tocco.</span> Intercettare l'evento e metterlo da parte.</td></tr>
+        <tr><td>iPhone / iPad in <strong>Safari</strong></td>
+          <td>I tre passaggi <strong>+ la freccia</strong>.</td></tr>
+        <tr><td>iPhone in Chrome / Edge / Firefox / DuckDuckGo</td>
+          <td>Le istruzioni <strong>per quel browser</strong>: da <strong>iOS 16.4</strong>
+            «Aggiungi a Home» c'è anche lì. Niente freccia — ogni browser mette Condividi in
+            un posto suo — e «apri in Safari» come <em>ripiego</em>, con copia dell'indirizzo
+            perché <code>x-safari-https://</code> non dà riscontro se fallisce.</td></tr>
+        <tr><td>Dentro Instagram, Facebook, WhatsApp…</td>
+          <td>«Esci da <em>nome</em>»: da lì non si installa, e fingere il contrario fa
+            sembrare rotta l'app.</td></tr>
+        <tr><td>Già installata, vista nel browser</td>
+          <td><strong>Non riproporre l'installazione</strong>: dire di aprirla dall'icona.</td></tr>
+        <tr><td>iOS sotto la 16.4</td>
+          <td>Installa lo stesso, ma <strong>avvertire</strong> che le notifiche non arriveranno.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota pericolo">
+    <span class="capo">Il pulsante morto</span>
+    <p>
+      Dopo un rifiuto, <code>beforeinstallprompt</code> <strong>non si ripresenta nella
+      stessa sessione</strong>. Un pulsante «Installa» lasciato acceso dopo un rifiuto è
+      un pulsante che non farà niente — e l'utente concluderà che l'app è rotta, non
+      che ha detto di no lui.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="link">
+  <h2><span class="numero">8</span>I link nell'app installata</h2>
+  <p class="occhiello-sez">
+    «Se la PWA è installata, il link deve aprirla»: sì su Android, mai su iOS.
+  </p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Piattaforma</th><th>Link da altre app</th><th>Link nel browser</th></tr></thead>
+      <tbody>
+        <tr><td>Android + Chrome (WebAPK)</td><td class="si">sì, affidabile</td><td class="si">sì</td></tr>
+        <tr><td>Android + Edge / Firefox</td><td class="no">no</td><td class="no">no</td></tr>
+        <tr><td>ChromeOS</td><td class="si">sì</td><td class="si">sì</td></tr>
+        <tr><td>macOS — app nel Dock da Safari</td><td class="si">sì</td><td class="si">sì</td></tr>
+        <tr><td>macOS / Windows — Chrome, Edge</td><td class="no">no</td><td class="forse">solo dalle proprie schede</td></tr>
+        <tr><td><strong>iOS / iPadOS</strong></td><td class="no">mai</td><td class="no">mai</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Cosa mettere nel manifest, dove funziona:</p>
+  <ul>
+    <li><code>handle_links: "preferred"</code> — l'utente può sempre annullarlo dalle
+      impostazioni dell'app: è una <strong>preferenza, non una garanzia</strong>, e
+      un'interfaccia che la dà per certa mente;</li>
+    <li><code>launch_handler: { client_mode: "navigate-existing" }</code> — porta
+      all'indirizzo la finestra già aperta invece di aprirne una seconda;</li>
+    <li><code>related_applications: [{ platform: "webapp", url: "&lt;url assoluto del
+      manifest&gt;" }]</code> — abilita <code>getInstalledRelatedApps()</code> a
+      riconoscere sé stessa.</li>
+  </ul>
+
+  <div class="nota attenzione">
+    <span class="capo">Due dettagli che si pagano più tardi</span>
+    <p>
+      <code>related_applications.url</code> <strong>dev'essere assoluto</strong>: scritto a
+      mano nel file, copiando il progetto su un altro dominio la rilevazione smette
+      di funzionare <em>in silenzio</em>. Conviene generarlo lato server dall'origine
+      della richiesta.
+    </p>
+    <p>
+      La rilevazione ha <strong>tre</strong> stati, non due: <code>true</code>,
+      <code>false</code> e <code>null</code> («non lo so», che è la risposta su iOS).
+      Trattare <code>null</code> come <code>false</code> significa affermare che
+      l'app non è installata quando non se ne sa nulla.
+    </p>
+  </div>
+
+  <p>
+    Infine: <strong>non esiste alcuna API per lanciare la PWA installata da una pagina
+    di browser.</strong> La cattura avviene prima, a livello di sistema: se il link è
+    già aperto nel browser, è tardi. Il massimo onesto è riconoscerlo e dire di
+    aprirla dall'icona. E su Android il WebAPK si aggiorna con ritardo — fino a circa
+    un giorno — quindi <code>handle_links</code> non ha effetto immediato sulle
+    installazioni esistenti.
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="misura">
+  <h2><span class="numero">9</span>L'apparato di misura</h2>
+  <p class="occhiello-sez">
+    La domanda da farsi prima di dichiarare pronto un banco di prova: <strong>se
+    fallisce, da dove leggo il perché?</strong>
+  </p>
+
+  <p>
+    Se la risposta è «lo chiedo a chi ha in mano il telefono», gli strumenti mancano
+    e il lavoro non è finito — perché quella persona risponderà «non è arrivata»,
+    che è l'informazione che si aveva già.
+  </p>
+
+  <p>
+    Qui l'esperimento <strong>scrive il proprio verbale</strong>. Le righe che contano
+    di più le scrive il dispositivo, non il server:
+  </p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Evento</th><th>Chi lo annota</th><th>Che cosa dimostra</th></tr></thead>
+      <tbody>
+        <tr><td><code>app-aperta</code></td><td>pagina</td>
+          <td>Se aperta dall'icona o dal browser: su iOS è la distinzione da cui dipende tutto.</td></tr>
+        <tr><td><code>sw-registrato</code></td><td>pagina</td><td>Esiste qualcosa che può ricevere.</td></tr>
+        <tr><td><code>permesso-concesso</code> / <code>negato</code></td><td>pagina</td>
+          <td>Se <em>negato</em>, il browser non richiederà più.</td></tr>
+        <tr><td><code>invio-esito</code></td><td>server</td>
+          <td><strong>Consegnata</strong> al servizio push. Non è «arrivata».</td></tr>
+        <tr><td><code>notifica-mostrata</code></td><td><strong>service worker</strong></td>
+          <td><strong>È comparsa sullo schermo</strong>, e quanti secondi dopo l'invio.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="nota buona">
+    <span class="capo">Il corollario che salva l'esperimento</span>
+    <p>
+      Lo strumento di misura non deve mai poter guastare ciò che misura. La
+      chiamata che annota va <strong>dopo</strong> <code>showNotification()</code> e
+      assorbe i propri errori: se fallisse per prima e interrompesse la catena, il
+      registro impedirebbe la notifica — e su Safari costerebbe l'iscrizione.
+    </p>
+  </div>
+
+  <h3>L'invio differito</h3>
+  <p>
+    Un pulsante «invia adesso» dimostra che il giro funziona, ma con l'app in primo
+    piano <strong>non prova che la notifica arrivi da fuori</strong>. Serve un invio
+    <strong>differito di dieci secondi</strong>: il server risponde
+    <code>202</code> subito — la risposta deve arrivare prima che l'utente chiuda
+    l'app, o vedrebbe un errore di rete proprio mentre fa la cosa giusta — e spedisce
+    dopo. Sullo schermo parte un conto alla rovescia, che serve a una cosa sola: dire
+    all'utente che deve chiudere l'app <em>adesso</em>.
+  </p>
+  <p>
+    Se l'utente ha chiuso davvero, il messaggio finale non lo leggerà mai. Ed è
+    esattamente il caso in cui la prova sta riuscendo.
+  </p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="sicurezza">
+  <h2><span class="numero">10</span>Sicurezza</h2>
+  <p class="occhiello-sez">
+    Un endpoint che agisce verso l'esterno nasce chiuso, non viene chiuso dopo.
+  </p>
+
+  <p>
+    Le rotte si separano per <strong>ampiezza dell'effetto</strong>, non per comodità.
+    È questa separazione a permettere di avere insieme un pulsante di prova
+    funzionante sul telefono e nessun endpoint sfruttabile da estranei:
+  </p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Rotta</th><th>Effetto</th><th>Protezione</th></tr></thead>
+      <tbody>
+        <tr><td><code>/api/prova</code></td><td>solo su <strong>chi chiama</strong></td>
+          <td><span class="si">Aperta.</span> Chi chiama deve esibire il <strong>proprio
+            endpoint push</strong>: una stringa lunga e non indovinabile che solo quel
+            telefono possiede. Al massimo uno fa squillare sé stesso.</td></tr>
+        <tr><td><code>/api/invia</code></td><td>su <strong>tutti</strong> i dispositivi</td>
+          <td><span class="no">Token sempre.</span> Se il token non è configurato risponde
+            <strong>chiusa, non aperta</strong>.</td></tr>
+        <tr><td><code>/api/annota</code></td><td>scrive nel verbale</td>
+          <td><span class="forse">Aperta</span> — deve poterci scrivere il service worker,
+            che non può custodire un segreto — ma con un <strong>elenco chiuso</strong> di
+            eventi ammessi e un limite di frequenza.</td></tr>
+        <tr><td><code>/api/registro</code></td><td>legge il verbale</td>
+          <td><span class="no">Token.</span> Contiene modelli di dispositivo, versioni di
+            sistema e orari delle prove.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <ul>
+    <li>La <strong>chiave privata VAPID</strong> firma le notifiche a nome del sito:
+      permessi <code>0600</code>, mai nei commit, mai nei log. Rigenerarla
+      <strong>invalida tutte le iscrizioni</strong>, perché i dispositivi sono legati
+      alla vecchia chiave pubblica.</li>
+    <li>Gli <strong>endpoint push</strong> nel verbale vanno troncati: sono la
+      credenziale con cui si spedisce a quel dispositivo. Ne bastano le ultime cifre
+      per riconoscere «lo stesso telefono di prima».</li>
+    <li><strong>Niente basic auth</strong> davanti a una PWA: manda in errore il
+      download del service worker e del manifest, e su iOS impedisce del tutto
+      l'aggiunta alla schermata Home.</li>
+    <li>La <strong>CSP</strong> deve includere <code>worker-src 'self'</code>, o il
+      browser blocca il service worker e non arriva nessuna notifica.</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="trappole">
+  <h2><span class="numero">11</span>Le trappole</h2>
+  <p class="occhiello-sez">Sintomo a sinistra, causa quasi certa a destra.</p>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Sintomo</th><th>Causa</th></tr></thead>
+      <tbody>
+        <tr><td><code>subscribe()</code> fallisce senza messaggio utile</td>
+          <td>Chiave VAPID non convertita da base64url a <code>Uint8Array</code>.</td></tr>
+        <tr><td>Ogni invio risponde <code>403</code></td>
+          <td>Le iscrizioni sono state fatte con un'altra coppia di chiavi: vanno rifatte dal dispositivo.</td></tr>
+        <tr><td>Su iPhone il permesso non viene mai chiesto</td>
+          <td>L'app è stata aperta da Safari e non dall'icona.</td></tr>
+        <tr><td><code>Notification.requestPermission()</code> ignorata</td>
+          <td>Non è partita da un tocco, o c'è un <code>await</code> prima che ha rotto il legame col gesto.</td></tr>
+        <tr><td>Le notifiche smettono di arrivare su iPhone dopo un po'</td>
+          <td>Un evento <code>push</code> non ha mostrato nulla: Safari ha revocato l'iscrizione.</td></tr>
+        <tr><td>Le correzioni al service worker non hanno effetto</td>
+          <td>È servito dalla cache: serve <code>Cache-Control: no-cache</code> su <code>/sw.js</code>.</td></tr>
+        <tr><td>Ora e batteria sopra i pulsanti, in modalità app</td>
+          <td><code>apple-mobile-web-app-status-bar-style: black-translucent</code>. Usare <code>default</code>.</td></tr>
+        <tr><td>«Service worker in errore» in Safari non installata</td>
+          <td>Falso allarme: <code>registration.pushManager</code> non esiste finché l'app non è installata. Va gestito, non segnalato come guasto.</td></tr>
+        <tr><td>Permesso concesso ma nessuna notifica</td>
+          <td><code>Notification.permission === 'granted'</code> <strong>non</strong> implica un'iscrizione push attiva: sono due cose distinte.</td></tr>
+        <tr><td>Invii falliti che si accumulano all'infinito</td>
+          <td>Non si cancellano le iscrizioni su <code>404</code>/<code>410</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="ordine">
+  <h2><span class="numero">12</span>Ordine di lavoro</h2>
+  <p class="occhiello-sez">
+    Scritto per un agente che debba costruire un'applicazione simile da zero.
+  </p>
+
+  <ol class="numerata">
+    <li><strong>Verifica il dominio prima di tutto.</strong> Serve un record DNS e un
+      certificato valido. Senza, non si può provare nulla di ciò che conta: iOS non
+      installa e le notifiche non partono. È il passo 1, non l'ultimo.</li>
+    <li><strong>Documentati su fonti primarie.</strong> Il supporto al Web Push su iOS
+      è cambiato più volte; quello che un modello «sa» a memoria è vecchio per
+      costruzione. Salva la nota così non va rifatto.</li>
+    <li><strong>Manifest, icone, service worker</strong> — nell'ordine. Il service
+      worker dalla radice, con <code>Service-Worker-Allowed: /</code>.</li>
+    <li><strong>Chiavi VAPID e archivio iscrizioni.</strong> Le chiavi di produzione
+      nascono sul server e non transitano dal repository.</li>
+    <li><strong>Il registro degli eventi, adesso e non dopo.</strong> Costruirlo alla
+      fine significa aver lavorato al buio fino a quel momento.</li>
+    <li><strong>Percorso utente</strong>: rilevamento piattaforma, invito
+      all'installazione, permesso da un tocco, iscrizione.</li>
+    <li><strong>Test automatici</strong> — sapendo cosa non dimostrano. Vale la pena
+      <em>eseguire</em> il service worker con payload diversi, non leggerne il sorgente.</li>
+    <li><strong>Deploy idempotente</strong>: processo sul solo loopback, reverse proxy
+      davanti, segreti generati sul server e mai sovrascritti da un aggiornamento.</li>
+    <li><strong>La prova sul telefono vero.</strong> È l'unica che conta, ed è l'unica
+      che un agente non può fare da solo.</li>
+    <li><strong>Scrivi gli esiti, compresi i fallimenti.</strong> Un esperimento che
+      documenta solo i successi non è un esperimento.</li>
+  </ol>
+
+  <div class="nota pericolo">
+    <span class="capo">La regola che riassume tutte le altre</span>
+    <p>
+      <strong>«Funziona su iOS» si dice solo dopo averlo visto su un iPhone.</strong>
+      Ogni riga di documentazione distingue <em>ipotesi</em> (quello che dice la
+      documentazione ufficiale) da <em>esito verificato</em> (quello che si è visto
+      accadere su un dispositivo reale, con modello e versione annotati). Nessuna
+      riga passa dall'una all'altro senza una prova.
+    </p>
+  </div>
+
+  <h3>Prima di dire che è finito</h3>
+  <ul class="controllo">
+    <li>Android Chrome: installazione in un tocco, notifica ricevuta ad app chiusa</li>
+    <li>Android: dopo un rifiuto il pulsante «Installa» <strong>non</strong> resta acceso e morto</li>
+    <li>iPhone Safari <strong>non</strong> installata: il pulsante notifiche è spento <em>con la spiegazione</em></li>
+    <li>iPhone installata: notifica ricevuta a schermo bloccato</li>
+    <li>Aperto da Instagram: dice di uscire, non finge che si possa installare</li>
+    <li>Il verbale contiene almeno un <code>notifica-mostrata</code> per ciascun telefono</li>
+    <li><code>/api/invia</code> senza token risponde <code>401</code></li>
+    <li><code>prefers-reduced-motion</code>: le animazioni informative si fermano ma non spariscono</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="esiti">
+  <h2><span class="numero">13</span>Gli esiti misurati</h2>
+  <p class="occhiello-sez">
+    Non stime: numeri letti dal verbale, prodotti da un iPhone reale.
+  </p>
+
+  <div class="numeri">
+    <div class="numero-carta evidenza">
+      <span class="etichetta">Comparse sul dispositivo</span>
+      <span class="valore">5 / 5</span>
+      <span class="sotto">nessun fallimento</span>
+    </div>
+    <div class="numero-carta">
+      <span class="etichetta">Ad app chiusa</span>
+      <span class="valore">3</span>
+      <span class="sotto">schermo bloccato</span>
+    </div>
+    <div class="numero-carta">
+      <span class="etichetta">Latenza reale</span>
+      <span class="valore">~1 s</span>
+      <span class="sotto">dalla partenza allo schermo</span>
+    </div>
+    <div class="numero-carta">
+      <span class="etichetta">Test automatici</span>
+      <span class="valore">69</span>
+      <span class="sotto">nessuna dipendenza di test</span>
+    </div>
+  </div>
+
+  <div class="tabella">
+    <table>
+      <thead><tr><th>Data</th><th>Sistema</th><th>Browser</th><th>App chiusa</th><th>Ritardi misurati</th></tr></thead>
+      <tbody>
+        <tr><td>29/08/2026</td><td>iOS 18.7</td><td>Safari 26.6</td><td class="si">5 su 5</td>
+          <td>10,8 s · 11,1 s · 11,8 s dopo un invio differito di 10 s</td></tr>
+        <tr><td>29/08/2026</td><td>iOS 18.7</td><td>Safari 26.6</td><td>in primo piano</td>
+          <td>0,8 s · 1,6 s</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Le tre prove differite sono partite dieci secondi dopo il tocco, ad app chiusa, e
+    sono comparse <strong>circa un secondo dopo</strong>: la latenza vera di APNs è
+    quel secondo, non gli undici. Zero invii falliti, zero iscrizioni perse.
+  </p>
+
+  <h3>Due difetti trovati dal verbale, non dall'occhio</h3>
+  <ol class="numerata">
+    <li>In Safari con l'app <strong>non</strong> installata, il registro segnava
+      «service worker in errore». Era un falso allarme: su iOS
+      <code>registration.pushManager</code> non esiste finché l'app non è installata.
+      Uno strumento che segnala guasti inesistenti è peggio di uno strumento assente.</li>
+    <li><code>black-translucent</code> faceva scorrere il contenuto <strong>sotto</strong>
+      la barra di stato: ora e batteria finivano sopra i pulsanti. Nessun test
+      automatico l'avrebbe preso — è un difetto che si vede solo guardando.</li>
+  </ol>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<section id="fonti">
+  <h2><span class="numero">14</span>Fonti</h2>
+  <p class="occhiello-sez">
+    Primarie, con la data della verifica. Vanno riconfermate a ogni major di iOS.
+  </p>
+
+  <ul>
+    <li><a href="https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/">Web Push for Web Apps on iOS and iPadOS</a>
+      — WebKit. Supporto da iOS 16.4, solo per web app aggiunte alla Home, permesso
+      solo in risposta a un'interazione diretta.</li>
+    <li><a href="https://developer.mozilla.org/en-US/docs/Web/API/Push_API">Push API</a> — MDN.</li>
+    <li><a href="https://www.npmjs.com/package/web-push">web-push</a> — la libreria di invio, versione 3.6.7.</li>
+    <li><a href="https://developer.chrome.com/docs/capabilities/pwa-navigation-management">Navigation management into installed PWAs</a>
+      — Chrome. <code>launch_handler</code> da Chrome 110, cattura dei link da Chrome 139 su desktop.</li>
+    <li><a href="https://github.com/WICG/pwa-url-handler/blob/main/explainer.md">pwa-url-handler explainer</a>
+      — WICG. <code>handle_links</code>.</li>
+    <li><a href="https://developer.chrome.com/docs/capabilities/get-installed-related-apps">Get Installed Related Apps API</a> — Chrome.</li>
+    <li><a href="https://github.com/khmyznikov/pwa-install">khmyznikov/pwa-install</a> e
+      <a href="https://github.com/philfung/add-to-homescreen">philfung/add-to-homescreen</a>
+      — MIT, le due librerie da cui sono state prese le decisioni d'interfaccia.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>
+  <p>
+    Le istruzioni passo passo per far parlare app e server:
+    <a href="/comunicazione">il sistema di comunicazione</a>.<br>
+    Generato dal progetto <a href="https://github.com/JoeBosi/pwa-push-lab" rel="noopener"><strong>pwa-push-lab</strong> su GitHub</a> (codice sorgente, licenza MIT) · in linea su
+    <a href="https://pwa.example.com">pwa.example.com</a> ·
+    il verbale delle prove è su <a href="/laboratorio">/laboratorio</a>.
+  </p>
+  <p>
+    Le sezioni 1, 6 e 7 riportano limiti di piattaforma verificati il 29 e 30 settembre
+    2026: sono la parte che invecchia per prima.
+  </p>
+</footer>
+
+</div>
+</body>
+</html>

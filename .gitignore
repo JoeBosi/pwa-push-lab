@@ -1,0 +1,34 @@
+# Struttura agentica: si versiona TUTTO cio' che serve alla portabilita'.
+# In particolare NON ignorare: .claude/, skills.manifest.json, docs/research/
+
+node_modules/
+.DS_Store
+*.log
+
+# Impostazioni personali della macchina (non portabili)
+.claude/settings.local.json
+
+# Segreti — mai versionare.
+# .env contiene la chiave PRIVATA VAPID: chi ce l'ha puo' spedire notifiche
+# a nome di questo sito su tutti i dispositivi iscritti.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# Le iscrizioni push dei dispositivi: endpoint e chiavi di cifratura di
+# telefoni reali. Non sono dati di prova riproducibili, sono dati di qualcuno.
+data/iscrizioni.json
+
+# Le icone sono generate da strumenti/genera-icone.js: si rigenerano, non si versionano.
+public/icone/*.png
+
+# Tutto cio che il server scrive: utenti, notizie, verbale.
+data/*
+!data/.gitkeep
+
+# Area di lavoro della pubblicazione su GitHub, e l elenco locale delle
+# informazioni personali da non pubblicare mai: non si versiona.
+.pubblicazione/

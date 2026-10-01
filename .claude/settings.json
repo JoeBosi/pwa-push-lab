@@ -1,0 +1,25 @@
+{
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
+  },
+  "enabledPlugins": {},
+  "permissions": {
+    "allow": [
+      "Bash(.claude/scripts/skill-search.sh:*)",
+      "Bash(.claude/scripts/skills-status.sh:*)",
+      "Bash(./.claude/scripts/skill-search.sh:*)",
+      "Bash(./.claude/scripts/skills-status.sh:*)",
+      "Bash(claude plugin list:*)",
+      "Bash(claude plugin details:*)",
+      "Bash(npx skills list:*)",
+      "Bash(npx skills find:*)",
+      "WebSearch",
+      "WebFetch"
+    ]
+  }
+}

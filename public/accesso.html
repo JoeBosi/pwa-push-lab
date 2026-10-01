@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Accesso — Notizie</title>
+<meta name="robots" content="noindex">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1e3a8a">
+<link rel="apple-touch-icon" href="/icone/apple-touch-icon.png">
+<link rel="icon" href="/icone/icona-192.png" type="image/png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="/stile.css">
+<link rel="stylesheet" href="/notizie.css">
+</head>
+<body>
+<a class="salta" href="#principale">Salta al contenuto</a>
+<p class="fascia-prova">
+  Sito di prova per test delle notifiche push per applicazioni PWA
+</p>
+<main id="principale">
+
+  <header class="eroe">
+    <img src="/icone/icona-192.png" alt="" width="76" height="76" class="logo">
+    <h1>Notizie</h1>
+    <p class="occhiello">Accesso riservato</p>
+  </header>
+
+  <section class="carta" id="carta-accesso">
+    <h2>Entra</h2>
+    <p class="tenue">Gli account li crea l'amministratore: non c'è registrazione pubblica.</p>
+    <form class="modulo" id="modulo-accesso" novalidate>
+      <label>Nome utente
+        <input name="nome" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </label>
+      <label>Password
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn primario">Entra</button>
+    </form>
+    <p class="esito" id="esito-accesso" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="carta nascosto" id="carta-cambio">
+    <h2>Scegli la tua password</h2>
+    <p class="tenue">
+      Quella che hai ricevuto valeva una volta sola. Da ora la conosci solo tu:
+      almeno 8 caratteri, diversa da quella iniziale.
+    </p>
+    <form class="modulo" id="modulo-cambio" novalidate>
+      <label>Password ricevuta
+        <input name="attuale" type="password" autocomplete="current-password" required>
+      </label>
+      <label>Nuova password
+        <input name="nuova" type="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label>Ripeti la nuova password
+        <input name="conferma" type="password" autocomplete="new-password" minlength="8" required>
+      </label>
+      <button type="submit" class="btn primario">Salva ed entra</button>
+    </form>
+    <p class="esito" id="esito-cambio" role="status" aria-live="polite"></p>
+  </section>
+
+  <footer class="pieddi">
+    <a class="collegamento" href="/architettura">Com'è fatto il sito</a>
+    <a class="collegamento" href="/banco">Banco di prova tecnico</a>
+  </footer>
+</main>
+<script src="/js/accesso.js" defer></script>
+</body>
+</html>

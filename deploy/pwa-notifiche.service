@@ -1,0 +1,49 @@
+[Unit]
+Description=PWA di prova per le notifiche push (pwa.example.com)
+Documentation=https://pwa.example.com/
+After=network-online.target
+Wants=network-online.target
+# Se il servizio va in crash loop, systemd smette di riavviarlo dopo 5 tentativi
+# in 60 secondi invece di consumare CPU all'infinito. Vanno in [Unit], non in
+# [Service]: in [Service] systemd le ignora silenziosamente.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=pwanotifiche
+Group=pwanotifiche
+WorkingDirectory=/opt/pwa-notifiche
+ExecStart=/usr/bin/node /opt/pwa-notifiche/server.js
+Restart=on-failure
+RestartSec=5
+SyslogIdentifier=pwa-notifiche
+
+# Si lega SOLO al loopback: da fuori si arriva unicamente passando da Caddy.
+Environment=HOST=127.0.0.1
+Environment=PORT=3020
+Environment=NODE_ENV=production
+
+# Chiavi VAPID. Il file e' 0600 e appartiene all'utente del servizio: la chiave
+# privata firma le notifiche a nome di questo sito e non deve essere leggibile
+# dagli altri utenti della macchina.
+EnvironmentFile=/opt/pwa-notifiche/.env
+
+# --- contenimento: il processo e' esposto a internet ---
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+# L'unica cartella su cui puo' scrivere: l'archivio delle iscrizioni push.
+ReadWritePaths=/opt/pwa-notifiche/data
+
+[Install]
+WantedBy=multi-user.target

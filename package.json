@@ -1,0 +1,44 @@
+{
+  "name": "pwa-push-lab",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Web Push notifications for installable PWAs on iPhone and Android, without Firebase: a lab, a reusable install-prompt component, and a multi-user news demo.",
+  "keywords": [
+    "pwa",
+    "web-push",
+    "push-notifications",
+    "vapid",
+    "service-worker",
+    "ios",
+    "install-prompt",
+    "web-component"
+  ],
+  "license": "MIT",
+  "author": "JoeBosi",
+  "homepage": "https://pwa.example.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JoeBosi/pwa-push-lab.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/pwa.test.js && node test/notizie.test.js",
+    "chiavi": "node strumenti/genera-vapid.js",
+    "icone": "node strumenti/genera-icone.js",
+    "banco": "node strumenti/banco.js",
+    "registro": "node strumenti/banco.js registro",
+    "segui": "node strumenti/banco.js segui",
+    "verifica": "node strumenti/banco.js verifica",
+    "utenti": "node strumenti/utenti.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "fast-xml-parser": "^5.11.2",
+    "web-push": "^3.6.7"
+  }
+}

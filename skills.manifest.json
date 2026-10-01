@@ -1,0 +1,42 @@
+{
+  "$schema": "https://example.invalid/skills-manifest-v1",
+  "version": 1,
+  "project": "AppPWA_NotificheTest",
+  "description": "Registro portabile delle capacita agentiche installate in questo progetto. Ricostruibile con .claude/scripts/bootstrap.sh",
+  "marketplaces": [
+    {
+      "name": "claude-plugins-official",
+      "source": "anthropics/claude-plugins-official",
+      "scope": "project"
+    }
+  ],
+  "plugins": [],
+  "skills": [
+    {
+      "name": "caddy-reverse-proxy",
+      "repo": "dimdasci/vps-setup",
+      "skill": "caddy-reverse-proxy",
+      "channel": "npx-skills",
+      "reason": "Il sito deve stare dietro Caddy con TLS valido: senza certificato reale iOS non installa la PWA e le push non partono. Qui serve la sintassi del vhost, non un promemoria generico."
+    },
+    {
+      "name": "web-design-guidelines",
+      "repo": "vercel-labs/agent-skills",
+      "skill": "web-design-guidelines",
+      "channel": "npx-skills",
+      "reason": "Audit di interfaccia, accessibilita' e leggibilita' delle pagine (linee guida Web Interface Guidelines di Vercel)."
+    }
+  ],
+  "local_skills": [
+    {
+      "name": "skill-first",
+      "path": ".claude/skills/skill-first",
+      "reason": "Meta-skill: procedura di ricerca/installazione skill esistenti prima di implementare a mano."
+    },
+    {
+      "name": "research-first",
+      "path": ".claude/skills/research-first",
+      "reason": "Meta-skill: ricerca documentazione ufficiale online prima di ogni task tecnico. Qui vale doppio: il Web Push su iOS cambia a ogni versione e la memoria del modello invecchia."
+    }
+  ]
+}

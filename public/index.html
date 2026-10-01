@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Notizie</title>
+<meta name="description" content="Sito di prova per test delle notifiche push per applicazioni PWA: notizie per categoria, con la frequenza che scegli tu.">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#1e3a8a">
+<link rel="apple-touch-icon" href="/icone/apple-touch-icon.png">
+<link rel="icon" href="/icone/icona-192.png" type="image/png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Notizie">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="/stile.css">
+<link rel="stylesheet" href="/notizie.css">
+</head>
+<body>
+<a class="salta" href="#principale">Salta al contenuto</a>
+
+<p class="fascia-prova">
+  Sito di prova per test delle notifiche push per applicazioni PWA ·
+  <a href="/banco">banco di prova</a>
+</p>
+
+<main id="principale" class="largo">
+
+  <header class="barra">
+    <div class="marchio">
+      <img src="/icone/icona-192.png" alt="" width="44" height="44">
+      <h1>Notizie</h1>
+    </div>
+    <div class="chi">
+      <span id="nome-utente">—</span><br>
+      <button type="button" class="collegamento" id="btn-esci">Esci</button>
+    </div>
+  </header>
+
+  <!-- ═══ Come funziona: per chi entra la prima volta ════════════════════
+       Prima c'erano tre riquadri senza un ordine: si doveva indovinare da
+       quale cominciare. Tre passi numerati lo dicono. -->
+  <ol class="passaggi" aria-label="Come funziona">
+    <li><strong>Attiva</strong> le notifiche su questo dispositivo</li>
+    <li><strong>Scegli</strong> categorie e frequenza</li>
+    <li><strong>Ricevi</strong> un riepilogo quando escono notizie</li>
+  </ol>
+
+  <!-- ═══ Notifiche su QUESTO dispositivo ═════════════════════════════════
+       La griglia dice cosa vuoi ricevere; questa carta dice se il telefono che
+       hai in mano puo' riceverlo. Sono due cose distinte e vanno tenute tali. -->
+  <section class="carta principale" id="carta">
+    <div class="pastiglia" id="pastiglia"><span class="punto"></span><span id="pastiglia-testo">Controllo…</span></div>
+    <h2 id="carta-titolo">Un momento…</h2>
+    <p id="carta-testo">Sto controllando che cosa può fare questo dispositivo.</p>
+    <div class="azioni">
+      <button id="btn-attiva" type="button" class="btn primario nascosto">Attiva le notifiche</button>
+      <button id="btn-installa" type="button" class="btn primario nascosto">Mostrami come</button>
+    </div>
+    <p id="esito" class="esito" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- ═══ La griglia: categoria × frequenza ═══════════════════════════════ -->
+  <section class="carta">
+    <h2>Cosa ricevere, e quanto spesso</h2>
+    <p class="tenue">
+      Una frequenza per ogni categoria. È un <strong>massimo</strong>: se in
+      quell'intervallo non esce niente di nuovo, non arriva niente. Se più
+      categorie scadono insieme, arrivano in <strong>una sola</strong> notifica.
+      «No» vuol dire nessuna notifica per quella categoria: le notizie restano
+      comunque leggibili qui sotto.
+    </p>
+    <div class="griglia" id="griglia"></div>
+    <p class="salvato" id="salvato" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- ═══ Le notizie ═══════════════════════════════════════════════════════ -->
+  <section class="carta">
+    <h2>Ultime notizie</h2>
+    <div class="filtri" id="filtri"></div>
+    <ol class="elenco" id="elenco"></ol>
+    <button type="button" class="btn discreto altre nascosto" id="btn-altre">Mostra altre notizie</button>
+    <p class="tenue nascosto" id="elenco-vuoto">Nessuna notizia in archivio per ora.</p>
+    <p class="tenue" id="fonti"></p>
+  </section>
+
+  <footer class="pieddi">
+    <button type="button" class="collegamento nascosto" id="btn-riaccendi">Rivedi l'invito all'installazione</button>
+    <a class="collegamento nascosto" href="/admin" id="link-admin">Gestione utenti</a>
+    <a class="collegamento" href="/architettura">Com'è fatto il sito</a>
+    <a class="collegamento" href="/comunicazione">Guida: app e server</a>
+    <a class="collegamento" href="/banco">Banco di prova tecnico</a>
+  </footer>
+</main>
+
+<pwa-invito nome-app="Notizie" icona="/icone/icona-192.png" ritardo="2500" rinvio-giorni="7"></pwa-invito>
+
+<script type="module" src="/componente/pwa-invito.js"></script>
+<script src="/js/notizie.js" defer></script>
+</body>
+</html>

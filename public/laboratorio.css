@@ -1,0 +1,86 @@
+/* Solo per la pagina dello strumento: la PWA non carica nulla di tutto questo. */
+
+.lab-main { max-width: 60rem; margin: 0 auto; }
+
+.lab-testata {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+}
+
+.lab-stato { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--tenue); }
+.spia { width: 9px; height: 9px; border-radius: 50%; background: var(--tenue); flex: none; }
+.lab-stato.viva .spia { background: var(--ok); animation: pulsa 2s ease-in-out infinite; }
+.lab-stato.ferma .spia { background: var(--attesa); }
+.lab-stato.persa .spia { background: var(--guasto); }
+@keyframes pulsa { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .lab-stato.viva .spia { animation: none; } }
+
+.campo {
+  font: inherit; flex: 1 1 16rem; min-height: 44px; padding: 10px 14px;
+  border: 1px solid var(--bordo); border-radius: 10px;
+  background: var(--sfondo); color: var(--testo);
+}
+
+/* --- le mattonelle dei numeri --- */
+.mattonelle {
+  display: grid; gap: 12px; margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+.mattonella {
+  background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: var(--raggio); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+/* Il numero che conta davvero: quante notifiche sono comparse su uno schermo. */
+.mattonella.evidenza { border-color: var(--primario-vivo); border-width: 2px; }
+.mattonella .etichetta { font-size: 0.78rem; color: var(--tenue); text-transform: uppercase; letter-spacing: 0.04em; }
+.mattonella strong { font-size: 1.9rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.mattonella .dettaglio { font-size: 0.8rem; color: var(--tenue); }
+.mattonella strong.nulla { color: var(--guasto); }
+.mattonella strong.bene { color: var(--ok); }
+
+.avviso {
+  background: color-mix(in srgb, var(--attesa) 12%, var(--carta));
+  border: 1px solid var(--attesa); border-left-width: 4px;
+  border-radius: var(--raggio); padding: 12px 16px; margin: 0 0 14px; font-size: 0.9rem;
+}
+
+/* --- filtri --- */
+.filtri { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.filtro {
+  font: inherit; font-size: 0.8rem; padding: 5px 11px; cursor: pointer;
+  border: 1px solid var(--bordo); border-radius: 999px;
+  background: transparent; color: var(--tenue);
+}
+.filtro.attivo { background: var(--primario-vivo); border-color: var(--primario-vivo); color: #fff; }
+
+/* --- il verbale --- */
+.verbale { list-style: none; margin: 0; padding: 0; }
+.verbale li {
+  display: grid; grid-template-columns: 4.5rem 1.6rem 1fr auto; gap: 10px;
+  align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--bordo);
+  font-size: 0.9rem;
+}
+.verbale li:last-child { border-bottom: 0; }
+.verbale .quando { color: var(--tenue); font-variant-numeric: tabular-nums; font-size: 0.82rem; }
+.verbale .cosa { font-weight: 600; }
+.verbale .chi { color: var(--tenue); font-size: 0.82rem; text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.verbale .cosa { min-width: 0; overflow-wrap: anywhere; }
+.verbale li.comparsa { background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.verbale li.comparsa .cosa { color: var(--ok); }
+.verbale li.errore .cosa { color: var(--guasto); }
+/* Una riga appena arrivata si nota senza dover cercare dov'era il fondo. */
+.verbale li.nuova { animation: entra 1.4s ease-out; }
+@keyframes entra { from { background: color-mix(in srgb, var(--primario-vivo) 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .verbale li.nuova { animation: none; } }
+
+@media (max-width: 34rem) {
+  .verbale li { grid-template-columns: 3.6rem 1.4rem 1fr; }
+  .verbale .chi { grid-column: 2 / -1; text-align: left; }
+}
+
+.tenue { color: var(--tenue); font-weight: 400; font-size: 0.85rem; }
+
+/* Passi numerati della spiegazione del verbale. */
+.passi { margin: 12px 0 4px; padding-left: 1.3em; }
+.passi li { margin-bottom: 8px; }

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Amministrazione — Notizie</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/icone/icona-192.png" type="image/png">
+<link rel="stylesheet" href="/stile.css">
+<link rel="stylesheet" href="/notizie.css">
+</head>
+<body>
+<a class="salta" href="#principale">Salta al contenuto</a>
+<p class="fascia-prova">Sito di prova per test delle notifiche push per applicazioni PWA · amministrazione</p>
+<main id="principale" class="largo">
+  <header class="barra">
+    <div class="marchio">
+      <img src="/icone/icona-192.png" alt="" width="44" height="44">
+      <h1>Utenti</h1>
+    </div>
+    <div class="chi"><a class="collegamento" href="/">← Notizie</a></div>
+  </header>
+
+  <section class="carta principale">
+    <h2>Nuovo utente</h2>
+    <p class="tenue">
+      La password iniziale la genera il server e compare <strong>una volta sola</strong>.
+      Comunicala tu: al primo accesso l'utente è obbligato a cambiarla.
+    </p>
+    <form class="modulo" id="modulo-crea" novalidate>
+      <label>Nome utente
+        <input name="nome" autocomplete="off" autocapitalize="none" spellcheck="false"
+               pattern="[a-z0-9._-]{3,32}" placeholder="es. mario.rossi…" aria-describedby="nome-regole" required>
+      </label>
+      <span class="tenue" id="nome-regole">Da 3 a 32 caratteri: lettere minuscole, cifre, punto, trattino.</span>
+      <button type="submit" class="btn primario">Crea utente</button>
+    </form>
+    <p class="esito" id="esito-crea" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- La password appena generata. Sparisce ricaricando la pagina: non e'
+       salvata in chiaro da nessuna parte, quindi non si puo' rileggere. -->
+  <section class="carta festa nascosto" id="carta-password">
+    <h2 id="password-titolo">Password iniziale</h2>
+    <p class="tenue" id="password-chi"></p>
+    <p><code class="password-mostrata" id="password-valore"></code></p>
+    <div class="azioni">
+      <button type="button" class="btn secondario" id="btn-copia">Copia</button>
+      <button type="button" class="btn discreto" id="btn-nascondi">Fatto, nascondi</button>
+    </div>
+  </section>
+
+  <section class="carta">
+    <h2>Tutti gli utenti</h2>
+    <ol class="elenco" id="elenco-utenti"></ol>
+    <p class="nota tenue">
+      Il ruolo di amministratore si assegna solo dal terminale del server: da qui
+      si possono creare utenti, non altri amministratori.
+    </p>
+  </section>
+
+  <footer class="pieddi">
+    <a class="collegamento" href="/laboratorio">Verbale delle prove</a>
+  </footer>
+</main>
+<script src="/js/admin.js" defer></script>
+</body>
+</html>

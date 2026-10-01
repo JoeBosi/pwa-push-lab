@@ -1,0 +1,120 @@
+/* Sito notizie: si appoggia ai colori e ai componenti di stile.css. */
+
+main.largo { max-width: 46rem; }
+
+/* La fascia che dichiara cosa sia questo sito. Discreta ma sempre visibile:
+   nessuno deve scambiarlo per un servizio di informazione vero. */
+.fascia-prova {
+  margin: calc(-1 * (env(safe-area-inset-top) + 28px)) calc(-1 * (env(safe-area-inset-right) + 18px)) 22px;
+  padding: calc(env(safe-area-inset-top) + 7px) 18px 7px;
+  background: var(--indaco); color: #fff;
+  font-size: .78rem; text-align: center; line-height: 1.4;
+}
+.fascia-prova a { color: #fff; }
+
+.barra {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 18px;
+}
+.barra .marchio { display: flex; align-items: center; gap: 11px; }
+.barra .marchio img { border-radius: 11px; }
+.barra h1 { font-size: 1.3rem; }
+.barra .chi { font-size: .85rem; color: var(--tenue); text-align: right; }
+.barra .chi button { margin-top: 2px; }
+
+/* ── la griglia ──────────────────────────────────────────────────────────── */
+.griglia { margin-top: 6px; }
+.riga {
+  padding: 14px 0; border-bottom: 1px solid var(--bordo);
+}
+.riga:last-child { border-bottom: 0; padding-bottom: 2px; }
+.riga-capo { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.riga-capo strong { font-size: .98rem; }
+.riga-capo .nota-cat { font-size: .76rem; color: var(--tenue); }
+
+.segmenti { display: flex; flex-wrap: wrap; gap: 6px; }
+.segmento {
+  font: inherit; font-size: .84rem; font-weight: 600;
+  min-height: 38px; padding: 7px 12px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--bordo); background: transparent; color: var(--tenue);
+}
+@media (hover: hover) {
+  .segmento:hover, .filtro:hover { border-color: var(--indaco-vivo); color: var(--indaco-vivo); }
+}
+.segmento[aria-pressed="true"] { background: var(--indaco-vivo); border-color: var(--indaco-vivo); color: #fff; }
+.segmento.spento[aria-pressed="true"] { background: var(--bordo); border-color: var(--bordo); color: var(--testo); }
+
+.prova-cat {
+  font: inherit; font-size: .78rem; color: var(--indaco-vivo);
+  background: none; border: 0; padding: 4px 0; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.salvato { font-size: .82rem; color: var(--ok); min-height: 1.2em; margin-top: 10px; }
+
+/* ── l'elenco ────────────────────────────────────────────────────────────── */
+.filtri { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.filtro {
+  font: inherit; font-size: .8rem; padding: 6px 12px; cursor: pointer;
+  border: 1px solid var(--bordo); border-radius: 999px; background: transparent; color: var(--tenue);
+}
+.filtro[aria-pressed="true"] { background: var(--indaco-vivo); border-color: var(--indaco-vivo); color: #fff; }
+
+.elenco { list-style: none; margin: 0; padding: 0; }
+.elenco li { padding: 12px 0; border-bottom: 1px solid var(--bordo); overflow-wrap: anywhere; }
+.elenco li:last-child { border-bottom: 0; }
+.elenco a { color: var(--testo); text-decoration: none; font-weight: 600; line-height: 1.4; }
+.elenco a:hover { color: var(--indaco-vivo); }
+.elenco .sotto { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: .78rem; color: var(--tenue); }
+.etichetta-cat {
+  font-weight: 650; color: var(--indaco-vivo);
+}
+
+/* ── accesso ─────────────────────────────────────────────────────────────── */
+.modulo { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.modulo label { font-size: .85rem; font-weight: 600; display: flex; flex-direction: column; gap: 5px; }
+.modulo input {
+  font: inherit; min-height: 48px; padding: 10px 14px;
+  border: 1px solid var(--bordo); border-radius: 12px;
+  background: var(--sfondo); color: var(--testo);
+}
+.modulo input:focus { outline: 2px solid var(--indaco-vivo); outline-offset: 1px; }
+.modulo .btn { flex: none; }
+
+/* ── amministrazione ─────────────────────────────────────────────────────── */
+.password-mostrata {
+  display: inline-block; font-size: 1.35rem; letter-spacing: .06em;
+  padding: 10px 16px; border-radius: 10px; user-select: all;
+}
+.riga-utente { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 14px; align-items: center; }
+.riga-utente .dati { min-width: 12rem; }
+.riga-utente .azioni-utente { display: flex; gap: 8px; }
+.riga-utente .azioni-utente button { flex: none; min-height: 38px; padding: 7px 12px; font-size: .84rem; }
+.btn.pericolo { background: transparent; color: var(--guasto); border-color: var(--guasto); flex: none; }
+.distintivo {
+  font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; background: var(--indaco-tenue); color: var(--indaco-vivo);
+}
+.distintivo.attesa { background: color-mix(in srgb, var(--attesa) 14%, transparent); color: var(--attesa); }
+
+/* ── come funziona ───────────────────────────────────────────────────────── */
+.passaggi {
+  list-style: none; margin: 0 0 16px; padding: 0; counter-reset: p;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+}
+.passaggi li {
+  counter-increment: p; position: relative; margin: 0;
+  background: var(--carta); border: 1px solid var(--bordo); border-radius: 14px;
+  padding: 34px 10px 11px; font-size: .8rem; line-height: 1.35; text-align: center; color: var(--tenue);
+}
+.passaggi li::before {
+  content: counter(p); position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--indaco-vivo); color: #fff; font-size: .72rem; font-weight: 700;
+}
+.passaggi strong { color: var(--testo); display: block; font-size: .9rem; }
+
+/* Il campo non eredita il grassetto dell'etichetta che lo contiene. */
+.modulo input { font-weight: 400; }
+/* Aiuto sotto un campo: piccolo e attenuato, legato al campo da aria-describedby. */
+.modulo .tenue { font-size: .82rem; color: var(--tenue); margin-top: -4px; }
+.altre { margin-top: 12px; width: 100%; }

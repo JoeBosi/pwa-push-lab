@@ -1,0 +1,259 @@
+/*
+ * Identita' visiva.
+ *
+ * Niente carattere da scaricare, e non per pigrizia: la CSP di questo sito non
+ * ammette risorse esterne, un font web e' un blocco di rete fra l'utente e la
+ * prima riga che deve leggere, e una PWA deve aprirsi anche senza connessione.
+ * L'identita' viene da colore, forma, ritmo e movimento — e il carattere di
+ * sistema, su un'app installata, e' quello giusto: sembra parte del telefono.
+ */
+
+:root {
+  /* Blu profondo dell'icona come colore portante, con una risalita piu' viva
+     per cio' su cui si tocca. */
+  --indaco: #1e3a8a;
+  --indaco-vivo: #2563eb;
+  --indaco-tenue: #eef3ff;
+
+  --sfondo: #f5f7fc;
+  --carta: #ffffff;
+  --testo: #131c33;
+  --tenue: #5d6a8a;
+  --bordo: #e4e8f2;
+
+  --ok: #17794a;
+  --ok-tenue: #e8f7ef;
+  --attesa: #9a6205;
+  --guasto: #b42318;
+
+  --raggio: 18px;
+  --raggio-grande: 24px;
+  --ombra: 0 1px 2px rgba(19, 28, 51, .05), 0 8px 26px -12px rgba(19, 28, 51, .14);
+  --carattere: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --indaco: #3b6fe0;
+    --indaco-vivo: #5b8cf5;
+    --indaco-tenue: #18213a;
+
+    --sfondo: #0b1120;
+    --carta: #151d31;
+    --testo: #e9edf7;
+    --tenue: #98a4c2;
+    --bordo: #26304d;
+
+    --ok: #4ade80;
+    --ok-tenue: #12271d;
+    --attesa: #fbbf24;
+    --guasto: #f87171;
+
+    --ombra: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 26px -12px rgba(0, 0, 0, .6);
+  }
+}
+
+/* Il componente dell'invito prende i colori da qui: un tema solo per tutto. */
+pwa-invito {
+  --pwa-accento: var(--indaco-vivo);
+  --pwa-accento-scuro: var(--indaco);
+  --pwa-fondo: var(--carta);
+  --pwa-testo: var(--testo);
+  --pwa-tenue: var(--tenue);
+  --pwa-bordo: var(--bordo);
+  --pwa-carattere: var(--carattere);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--sfondo);
+  color: var(--testo);
+  font: 16px/1.55 var(--carattere);
+  -webkit-font-smoothing: antialiased;
+  padding:
+    calc(env(safe-area-inset-top) + 28px)
+    calc(env(safe-area-inset-right) + 18px)
+    calc(env(safe-area-inset-bottom) + 40px)
+    calc(env(safe-area-inset-left) + 18px);
+}
+
+main { max-width: 32rem; margin: 0 auto; }
+
+/* ── testata ─────────────────────────────────────────────────────────────── */
+.eroe { text-align: center; margin-bottom: 26px; }
+.logo {
+  border-radius: 19px;
+  box-shadow: 0 10px 26px -10px rgba(30, 58, 138, .55);
+  margin-bottom: 14px;
+}
+h1 {
+  font-size: 1.55rem; margin: 0; letter-spacing: -0.025em; line-height: 1.18;
+  font-weight: 700;
+}
+.occhiello {
+  margin: 7px 0 0; font-size: .78rem; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--tenue);
+}
+
+/* ── carte ───────────────────────────────────────────────────────────────── */
+.carta {
+  background: var(--carta);
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio-grande);
+  box-shadow: var(--ombra);
+  padding: 22px;
+  margin-bottom: 14px;
+}
+.carta h2 { font-size: 1.14rem; margin: 0 0 7px; letter-spacing: -0.015em; }
+.carta p { margin: 0 0 4px; }
+.carta p.tenue { color: var(--tenue); font-size: .91rem; }
+
+/* La carta su cui si deve agire adesso: e' l'unica con il bordo colorato,
+   cosi' l'occhio sa sempre dove cominciare. */
+.principale { border-color: color-mix(in srgb, var(--indaco-vivo) 35%, var(--bordo)); }
+.principale.risolta { border-color: color-mix(in srgb, var(--ok) 35%, var(--bordo)); }
+
+/* ── la pastiglia di stato ───────────────────────────────────────────────── */
+.pastiglia {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: .74rem; font-weight: 650; letter-spacing: .05em; text-transform: uppercase;
+  padding: 5px 11px 5px 9px; border-radius: 999px;
+  background: var(--indaco-tenue); color: var(--indaco-vivo);
+  margin-bottom: 11px;
+}
+.pastiglia .punto { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pastiglia.ok { background: var(--ok-tenue); color: var(--ok); }
+.pastiglia.attesa { background: color-mix(in srgb, var(--attesa) 14%, transparent); color: var(--attesa); }
+.pastiglia.guasto { background: color-mix(in srgb, var(--guasto) 12%, transparent); color: var(--guasto); }
+
+/* ── pulsanti ────────────────────────────────────────────────────────────── */
+.azioni { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.azioni:empty { margin-top: 0; }
+
+.btn {
+  font: inherit; font-size: .96rem; font-weight: 650;
+  flex: 1 1 9rem; min-height: 50px; padding: 13px 20px;
+  border: 1.5px solid transparent; border-radius: 14px; cursor: pointer;
+  transition: transform .12s ease, background .15s ease, opacity .15s ease;
+}
+.btn:not(:disabled):active { transform: scale(.978); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.primario { background: var(--indaco-vivo); color: #fff; }
+.secondario { background: transparent; color: var(--indaco-vivo); border-color: var(--bordo); }
+/* Fra le due prove, quella che conta e' la differita: si vede. */
+.secondario.accentato { border-color: var(--indaco-vivo); }
+.discreto { background: transparent; color: var(--tenue); border-color: var(--bordo); flex: 0 1 auto; }
+
+/* Il passaggio del mouse si vede: un pulsante che non reagisce sembra spento. */
+@media (hover: hover) {
+  .primario:not(:disabled):hover { background: var(--indaco); }
+  .secondario:not(:disabled):hover, .discreto:not(:disabled):hover {
+    background: color-mix(in srgb, var(--indaco-vivo) 8%, transparent);
+  }
+  .collegamento:hover { color: var(--indaco-vivo); }
+}
+
+.esito { margin-top: 14px; font-size: .91rem; min-height: 1.2em; color: var(--tenue); }
+.esito.ok { color: var(--ok); }
+.esito.guasto { color: var(--guasto); }
+
+/* ── conto alla rovescia ─────────────────────────────────────────────────── */
+.conto { text-align: center; margin-top: 22px; position: relative; }
+.quadrante { width: 116px; height: 116px; transform: rotate(-90deg); }
+.pista, .arco { fill: none; stroke-width: 6; }
+.pista { stroke: var(--bordo); }
+.arco {
+  stroke: var(--indaco-vivo); stroke-linecap: round;
+  /* 2πr con r=44 → 276.5: la circonferenza intera. */
+  stroke-dasharray: 276.5; stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+}
+.conto strong {
+  position: absolute; top: 58px; left: 0; right: 0;
+  font-size: 2.3rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  transform: translateY(-50%); letter-spacing: -0.03em;
+}
+.conto p { margin: 10px 0 0; font-size: .92rem; font-weight: 600; color: var(--indaco-vivo); }
+
+/* ── la festa: l'istante che conta ───────────────────────────────────────── */
+.festa { border-color: color-mix(in srgb, var(--ok) 40%, var(--bordo)); text-align: center; }
+.festa-segno { display: flex; justify-content: center; margin-bottom: 12px; }
+.festa-segno svg { width: 58px; height: 58px; }
+.festa-segno circle {
+  fill: none; stroke: var(--ok); stroke-width: 3;
+  stroke-dasharray: 151; stroke-dashoffset: 151;
+  animation: traccia .55s ease-out forwards;
+}
+.festa-segno path {
+  fill: none; stroke: var(--ok); stroke-width: 4;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 36; stroke-dashoffset: 36;
+  animation: traccia .34s .42s ease-out forwards;
+}
+@keyframes traccia { to { stroke-dashoffset: 0; } }
+.festa h2 { color: var(--ok); }
+.festa .btn { margin-top: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .festa-segno circle, .festa-segno path { animation: none; stroke-dashoffset: 0; }
+  .arco { transition: none; }
+}
+
+/* ── il resto ────────────────────────────────────────────────────────────── */
+.spiegazione summary {
+  cursor: pointer; font-weight: 650; font-size: .96rem;
+  /* Il triangolo di sistema e' minuscolo su iOS: il bersaglio dev'essere la riga. */
+  padding: 2px 0; list-style-position: inside;
+}
+.spiegazione p { margin: 12px 0 0; font-size: .92rem; }
+
+.pieddi {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px;
+  margin-top: 26px;
+}
+.collegamento {
+  font: inherit; font-size: .85rem; color: var(--tenue);
+  background: none; border: 0; padding: 6px; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+
+.nascosto { display: none !important; }
+
+/* ── accessibilita' (audit 2026-10-01, vedi docs/audit-interfaccia-2026-10-01.md) ── */
+
+/* Campi, barre di scorrimento e controlli nativi seguono il tema: senza, in tema
+   scuro resterebbero chiari su fondo scuro. */
+:root { color-scheme: light dark; }
+
+/* Il focus da tastiera si vede sempre; quello dal tocco o dal clic no. */
+:focus-visible { outline: 3px solid var(--indaco-vivo); outline-offset: 2px; border-radius: 6px; }
+
+/* Il primo tasto Tab porta qui: chi naviga da tastiera salta testata e menu. */
+.salta {
+  position: absolute; left: 12px; top: -60px; z-index: 1000;
+  background: var(--indaco-vivo); color: #fff; padding: 10px 16px; border-radius: 10px;
+  font-weight: 650; text-decoration: none;
+}
+.salta:focus { top: calc(env(safe-area-inset-top) + 10px); }
+
+/* Niente ritardo del doppio tocco sui comandi, e niente lampo grigio: lo stato
+   premuto lo disegniamo noi (:active). */
+button, a, .btn, input { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+/* Titoli senza parole orfane sull'ultima riga. */
+h1, h2, h3 { text-wrap: balance; }
+p, li { text-wrap: pretty; }
+
+/* Etichetta letta dal lettore di schermo ma non mostrata: quando il titolo
+   visibile del riquadro dice gia' cosa va scritto nel campo. */
+.nascosto-visivo {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Testo d'accompagnamento: piccolo e attenuato. Usato da laboratorio e admin. */
+.nota { color: var(--tenue); font-size: .85rem; margin-top: 12px; }
+.sottotitolo { margin: 2px 0 0; color: var(--tenue); font-size: .9rem; }

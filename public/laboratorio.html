@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banco di prova — notifiche push</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#f5f7fc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icone/icona-192.png" type="image/png">
+<link rel="stylesheet" href="/stile.css">
+<link rel="stylesheet" href="/laboratorio.css">
+</head>
+<body class="lab">
+<a class="salta" href="#principale">Salta al contenuto</a>
+
+<main id="principale" class="lab-main">
+
+  <header class="lab-testata">
+    <div>
+      <h1>Banco di prova</h1>
+      <p class="sottotitolo" id="lab-server">—</p>
+    </div>
+    <div class="lab-stato" id="lab-connessione"><span class="spia"></span><span>in attesa</span></div>
+  </header>
+
+  <!-- Accesso: il verbale contiene modelli di telefono, versioni e orari. -->
+  <section class="carta" id="riquadro-accesso">
+    <h2>Token</h2>
+    <p>Il verbale contiene modelli di dispositivo, versioni di sistema e orari delle
+       prove: serve il token che sta in <code>TOKEN_INVIO</code>.</p>
+    <div class="azioni">
+      <label for="campo-token" class="nascosto-visivo">Token di accesso al verbale</label>
+      <input type="password" id="campo-token" name="token" class="campo" placeholder="Incolla qui il token…" autocomplete="off" spellcheck="false">
+      <button type="button" id="btn-entra" class="btn primario">Apri il verbale</button>
+    </div>
+    <p class="esito" id="esito-accesso" role="status" aria-live="polite"></p>
+    <p class="nota">
+      Si legge dal server con <code>sudo grep TOKEN_INVIO /opt/pwa-notifiche/.env</code>.
+      Resta in questa scheda del browser e non viene salvato altrove.
+    </p>
+  </section>
+
+  <div id="pannello" class="nascosto">
+
+    <!-- I numeri che dicono, in due secondi, se l'esperimento sta riuscendo. -->
+    <section class="mattonelle">
+      <div class="mattonella">
+        <span class="etichetta">Dispositivi iscritti</span>
+        <strong id="m-dispositivi">—</strong>
+        <span class="dettaglio" id="m-piattaforme"></span>
+      </div>
+      <div class="mattonella">
+        <span class="etichetta">Consegnate al servizio push</span>
+        <strong id="m-consegnate">—</strong>
+        <span class="dettaglio" id="m-fallite"></span>
+      </div>
+      <div class="mattonella evidenza">
+        <span class="etichetta">Comparse sul dispositivo</span>
+        <strong id="m-comparse">—</strong>
+        <span class="dettaglio">è questa che conta</span>
+      </div>
+      <div class="mattonella">
+        <span class="etichetta">Ritardo tipico</span>
+        <strong id="m-ritardo">—</strong>
+        <span class="dettaglio">invio → schermo</span>
+      </div>
+    </section>
+
+    <p class="avviso nascosto" id="avviso"></p>
+
+    <section class="carta">
+      <h2>Verbale <span class="tenue" id="conta-eventi"></span></h2>
+      <div class="filtri" id="filtri"></div>
+      <ol class="verbale" id="verbale"></ol>
+      <p class="nota" id="verbale-vuoto">
+        Nessun evento. Apri <a href="/" target="_blank" rel="noopener">la PWA</a> dal
+        telefono: da lì in poi ogni passo compare qui, in tempo reale.
+      </p>
+    </section>
+
+    <section class="carta">
+      <h2>Strumenti</h2>
+      <div class="azioni">
+        <button type="button" id="btn-invia-tutti" class="btn secondario">Notifica a tutti i dispositivi</button>
+        <button type="button" id="btn-pausa" class="btn discreto">Metti in pausa</button>
+      </div>
+      <p class="esito" id="esito-strumenti" role="status" aria-live="polite"></p>
+      <p class="nota">
+        <a href="/architettura" target="_blank" rel="noopener">Come è fatta questa
+        applicazione</a> — architettura, codice essenziale e trappole.<br>
+        L'invio a tutti passa da <code>/api/invia</code> ed esige il token. Il pulsante
+        di prova dentro la PWA usa invece <code>/api/prova</code>, che spedisce solo al
+        dispositivo che lo chiede: per questo può restare aperto.
+      </p>
+    </section>
+
+    <details class="carta spiegazione">
+      <summary>Come si legge il verbale</summary>
+      <p>La sequenza di una prova riuscita, dall'alto in basso:</p>
+      <ol class="passi">
+        <li><strong>app aperta</strong> — dice subito se dall'icona o dal browser: su iOS è la distinzione da cui dipende tutto.</li>
+        <li><strong>service worker pronto</strong> — senza questo non esiste nulla che possa ricevere una notifica.</li>
+        <li><strong>permesso concesso</strong> — se qui c'è <em>negato</em>, il browser non lo richiederà più: va riaperto dalle impostazioni di sistema.</li>
+        <li><strong>iscrizione push creata</strong> — il dispositivo ora ha un indirizzo a cui essere raggiunto.</li>
+        <li><strong>consegnata al servizio push</strong> — il server ha finito il suo lavoro. <em>Non</em> significa che sia arrivata.</li>
+        <li><strong>notifica comparsa</strong> — l'ha detto il dispositivo. Solo qui la prova è riuscita.</li>
+      </ol>
+      <p class="nota">
+        Se il verbale si ferma al passo 5, il giro server → Google/Apple funziona e il
+        problema è sul telefono: notifiche silenziate per quell'app, oppure offline.
+        Se si ferma prima, il problema è nella sequenza stessa e il passo mancante dice dove.
+      </p>
+    </details>
+  </div>
+</main>
+
+<script src="/js/laboratorio.js" defer></script>
+</body>
+</html>

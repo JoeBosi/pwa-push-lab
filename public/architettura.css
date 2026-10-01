@@ -1,0 +1,300 @@
+/*
+ * Foglio della pagina /architettura. Separato perche' la CSP del sito vieta gli
+ * stili in linea: default-src 'none'; style-src 'self'. Nessun style="" in
+ * tutta la pagina, nemmeno dentro l'SVG del diagramma.
+ */
+
+:root {
+  --indaco: #1e3a8a;
+  --indaco-vivo: #2563eb;
+  --indaco-tenue: #eef3ff;
+  --sfondo: #f5f7fc;
+  --carta: #ffffff;
+  --testo: #131c33;
+  --tenue: #5d6a8a;
+  --bordo: #e4e8f2;
+  --ok: #17794a;
+  --ok-tenue: #e8f7ef;
+  --attesa: #9a6205;
+  --attesa-tenue: #fdf6e7;
+  --guasto: #b42318;
+  --guasto-tenue: #fdeceb;
+  --codice-fondo: #10172a;
+  --codice-testo: #dbe4f7;
+  --carattere: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --indaco: #3b6fe0;
+    --indaco-vivo: #5b8cf5;
+    --indaco-tenue: #18213a;
+    --sfondo: #0b1120;
+    --carta: #151d31;
+    --testo: #e9edf7;
+    --tenue: #98a4c2;
+    --bordo: #26304d;
+    --ok: #4ade80;
+    --ok-tenue: #12271d;
+    --attesa: #fbbf24;
+    --attesa-tenue: #2a2110;
+    --guasto: #f87171;
+    --guasto-tenue: #2c1614;
+    --codice-fondo: #070c17;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--sfondo);
+  color: var(--testo);
+  font: 16px/1.65 var(--carattere);
+  -webkit-text-size-adjust: 100%;
+}
+
+.guscio {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 0 18px 80px;
+  display: grid;
+  gap: 40px;
+  grid-template-columns: 1fr;
+}
+
+/* L'indice affiancato solo quando c'e' spazio vero: sotto, scorre col testo. */
+@media (min-width: 62rem) {
+  .guscio { grid-template-columns: 15rem 1fr; align-items: start; }
+  .indice { position: sticky; top: 28px; max-height: calc(100vh - 56px); overflow-y: auto; }
+}
+
+/* ── testata ─────────────────────────────────────────────────────────────── */
+.testata {
+  grid-column: 1 / -1;
+  padding: 52px 0 36px;
+  border-bottom: 1px solid var(--bordo);
+  margin-bottom: 4px;
+}
+.briciole {
+  font-size: .76rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--indaco-vivo); margin: 0 0 12px;
+}
+h1 {
+  font-size: clamp(1.8rem, 5vw, 2.7rem); line-height: 1.12;
+  letter-spacing: -0.03em; margin: 0 0 14px; font-weight: 750;
+}
+.sommario { font-size: 1.08rem; color: var(--tenue); max-width: 46rem; margin: 0; }
+.meta {
+  margin: 22px 0 0; padding: 0; list-style: none;
+  display: flex; flex-wrap: wrap; gap: 8px 10px;
+  font-size: .82rem; color: var(--tenue);
+}
+.meta li {
+  background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: 999px; padding: 4px 12px;
+}
+
+/* ── indice ──────────────────────────────────────────────────────────────── */
+.indice h2 {
+  font-size: .74rem; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--tenue); margin: 0 0 10px;
+}
+.indice ol { list-style: none; margin: 0; padding: 0; counter-reset: i; }
+.indice li { counter-increment: i; }
+.indice a {
+  display: block; padding: 5px 0 5px 26px; position: relative;
+  color: var(--tenue); text-decoration: none; font-size: .88rem; line-height: 1.35;
+  border-left: 2px solid transparent;
+}
+.indice a::before {
+  content: counter(i); position: absolute; left: 8px;
+  font-variant-numeric: tabular-nums; font-size: .78rem; opacity: .65;
+}
+.indice a:hover { color: var(--indaco-vivo); border-left-color: var(--indaco-vivo); }
+
+/* ── sezioni ─────────────────────────────────────────────────────────────── */
+section { scroll-margin-top: 24px; padding-top: 32px; }
+h2 {
+  font-size: 1.5rem; letter-spacing: -0.022em; margin: 0 0 6px; line-height: 1.2;
+}
+h2 .numero {
+  display: inline-block; min-width: 1.9rem;
+  color: var(--indaco-vivo); font-variant-numeric: tabular-nums;
+}
+h3 {
+  font-size: 1.06rem; letter-spacing: -0.012em;
+  margin: 30px 0 8px; line-height: 1.3;
+}
+p { margin: 0 0 14px; max-width: 46rem; }
+.occhiello-sez {
+  color: var(--tenue); font-size: .95rem; margin: 0 0 22px; max-width: 46rem;
+}
+strong { font-weight: 650; }
+a { color: var(--indaco-vivo); }
+
+ul, ol.numerata { max-width: 46rem; padding-left: 1.25rem; margin: 0 0 14px; }
+li { margin-bottom: 7px; }
+
+/* ── riquadri di richiamo ────────────────────────────────────────────────── */
+.nota {
+  border-left: 4px solid var(--indaco-vivo);
+  background: var(--indaco-tenue);
+  border-radius: 0 12px 12px 0;
+  padding: 15px 18px; margin: 0 0 18px; max-width: 46rem;
+}
+.nota p:last-child { margin-bottom: 0; }
+.nota .capo {
+  font-size: .74rem; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--indaco-vivo);
+  display: block; margin-bottom: 5px;
+}
+.nota.pericolo { border-left-color: var(--guasto); background: var(--guasto-tenue); }
+.nota.pericolo .capo { color: var(--guasto); }
+.nota.attenzione { border-left-color: var(--attesa); background: var(--attesa-tenue); }
+.nota.attenzione .capo { color: var(--attesa); }
+.nota.buona { border-left-color: var(--ok); background: var(--ok-tenue); }
+.nota.buona .capo { color: var(--ok); }
+
+/* ── tabelle ─────────────────────────────────────────────────────────────── */
+.tabella { overflow-x: auto; margin: 0 0 20px; -webkit-overflow-scrolling: touch; }
+table {
+  border-collapse: collapse; width: 100%; min-width: 30rem;
+  font-size: .91rem; background: var(--carta);
+  border: 1px solid var(--bordo); border-radius: 12px;
+}
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--bordo); vertical-align: top; }
+th { font-size: .76rem; letter-spacing: .06em; text-transform: uppercase; color: var(--tenue); font-weight: 700; }
+tbody tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+.si { color: var(--ok); font-weight: 650; }
+.no { color: var(--guasto); font-weight: 650; }
+.forse { color: var(--attesa); font-weight: 650; }
+
+/* ── codice ──────────────────────────────────────────────────────────────── */
+code {
+  font-family: var(--mono); font-size: .88em;
+  background: var(--indaco-tenue); color: var(--indaco-vivo);
+  padding: 1px 6px; border-radius: 5px;
+}
+pre {
+  background: var(--codice-fondo); color: var(--codice-testo);
+  border-radius: 14px; padding: 18px 20px; overflow-x: auto;
+  margin: 0 0 20px; font-size: .85rem; line-height: 1.6;
+  -webkit-overflow-scrolling: touch;
+}
+pre code { background: none; color: inherit; padding: 0; font-size: 1em; }
+.titolo-codice {
+  font-family: var(--mono); font-size: .76rem; color: var(--tenue);
+  margin: 0 0 6px; letter-spacing: .02em;
+}
+.c-commento { color: #7c8bb0; font-style: italic; }
+.c-chiave { color: #c792ea; }
+.c-stringa { color: #a5e8a0; }
+.c-nome { color: #82b5ff; }
+.c-numero { color: #f7c97e; }
+
+/* ── diagramma ───────────────────────────────────────────────────────────── */
+.diagramma {
+  background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: 16px; padding: 22px; margin: 0 0 20px; overflow-x: auto;
+}
+.diagramma svg { width: 100%; min-width: 34rem; height: auto; display: block; }
+.d-scatola { fill: var(--carta); stroke: var(--bordo); stroke-width: 1.5; }
+.d-scatola-forte { fill: var(--indaco-tenue); stroke: var(--indaco-vivo); stroke-width: 2; }
+.d-scatola-ok { fill: var(--ok-tenue); stroke: var(--ok); stroke-width: 2; }
+.d-testo { fill: var(--testo); font: 600 13px var(--carattere); }
+.d-piccolo { fill: var(--tenue); font: 400 11px var(--carattere); }
+.d-etichetta { fill: var(--tenue); font: 500 10.5px var(--mono); }
+.d-freccia { stroke: var(--indaco-vivo); stroke-width: 1.8; fill: none; }
+.d-punta { fill: var(--indaco-vivo); }
+.d-tratteggio { stroke: var(--tenue); stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+
+/* ── lista di controllo ──────────────────────────────────────────────────── */
+.controllo { list-style: none; padding: 0; margin: 0 0 18px; max-width: 46rem; }
+.controllo li {
+  position: relative; padding-left: 30px; margin-bottom: 10px;
+}
+.controllo li::before {
+  content: ""; position: absolute; left: 0; top: 5px;
+  width: 16px; height: 16px; border-radius: 4px;
+  border: 1.8px solid var(--bordo);
+}
+
+/* ── numeri misurati ─────────────────────────────────────────────────────── */
+.numeri {
+  display: grid; gap: 12px; margin: 0 0 20px;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  max-width: 46rem;
+}
+.numero-carta {
+  background: var(--carta); border: 1px solid var(--bordo);
+  border-radius: 14px; padding: 15px 17px;
+}
+.numero-carta .etichetta {
+  display: block; font-size: .73rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--tenue); margin-bottom: 3px;
+}
+.numero-carta .valore {
+  font-size: 1.7rem; font-weight: 700; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+.numero-carta .sotto { font-size: .8rem; color: var(--tenue); }
+.numero-carta.evidenza { border-color: var(--ok); border-width: 2px; }
+.numero-carta.evidenza .valore { color: var(--ok); }
+
+/* ── pie' di pagina ──────────────────────────────────────────────────────── */
+footer {
+  grid-column: 1 / -1; margin-top: 56px; padding-top: 26px;
+  border-top: 1px solid var(--bordo); color: var(--tenue); font-size: .88rem;
+}
+
+/* ── stampa ──────────────────────────────────────────────────────────────── */
+@media print {
+  :root { --sfondo: #fff; --carta: #fff; --testo: #000; --tenue: #444; --bordo: #bbb; }
+  .indice { display: none; }
+  .guscio { grid-template-columns: 1fr; max-width: none; }
+  pre { background: #f4f4f4; color: #111; border: 1px solid #ccc; }
+  .c-commento, .c-chiave, .c-stringa, .c-nome, .c-numero { color: #333; }
+  section { page-break-inside: avoid; }
+  a { color: inherit; text-decoration: none; }
+}
+
+/* ── accessibilita' (audit 2026-10-01, vedi docs/audit-interfaccia-2026-10-01.md) ── */
+
+/* Campi, barre di scorrimento e controlli nativi seguono il tema: senza, in tema
+   scuro resterebbero chiari su fondo scuro. */
+:root { color-scheme: light dark; }
+
+/* Il focus da tastiera si vede sempre; quello dal tocco o dal clic no. */
+:focus-visible { outline: 3px solid var(--indaco-vivo); outline-offset: 2px; border-radius: 6px; }
+
+/* Il primo tasto Tab porta qui: chi naviga da tastiera salta testata e menu. */
+.salta {
+  position: absolute; left: 12px; top: -60px; z-index: 1000;
+  background: var(--indaco-vivo); color: #fff; padding: 10px 16px; border-radius: 10px;
+  font-weight: 650; text-decoration: none;
+}
+.salta:focus { top: calc(env(safe-area-inset-top) + 10px); }
+
+/* Niente ritardo del doppio tocco sui comandi, e niente lampo grigio: lo stato
+   premuto lo disegniamo noi (:active). */
+button, a, .btn, input { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+
+/* Titoli senza parole orfane sull'ultima riga. */
+h1, h2, h3 { text-wrap: balance; }
+p, li { text-wrap: pretty; }
+
+/* ── diagrammi: elementi aggiunti il 2026-10-01 ──────────────────────────── */
+.d-vita { stroke: var(--bordo); stroke-width: 1.5; stroke-dasharray: 4 5; }
+.d-separatore { stroke: var(--tenue); stroke-width: 1; stroke-dasharray: 2 6; opacity: .7; }
+.d-freccia-ok { stroke: var(--ok); stroke-width: 2; fill: none; }
+.d-punta-ok { fill: var(--ok); }
+.d-domanda { fill: var(--carta); stroke: var(--tenue); stroke-width: 1.3; }
+.d-si { fill: var(--ok); font: 700 10.5px var(--carattere); }
+.d-no { fill: var(--guasto); font: 700 10.5px var(--carattere); }
+.d-corsivo { fill: var(--tenue); font: italic 400 11.5px var(--carattere); }
+.didascalia {
+  font-size: .82rem; color: var(--tenue); margin: -10px 0 22px; max-width: 46rem;
+}

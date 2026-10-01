@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Banco di prova — notifiche push</title>
+<meta name="description" content="Banco di prova per l'installazione della PWA e le notifiche push su Android e iOS.">
+
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#f5f7fc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1120" media="(prefers-color-scheme: dark)">
+
+<!-- iOS ignora il manifest per l'icona della schermata Home: usa questa. -->
+<link rel="apple-touch-icon" href="/icone/apple-touch-icon.png">
+<link rel="icon" href="/icone/icona-192.png" type="image/png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Notifiche">
+<!-- NON black-translucent: con quello il contenuto scorre SOTTO la barra di
+     stato e ora e batteria finiscono sopra i pulsanti. Con default iOS riserva
+     la barra e le da' come sfondo il theme_color del manifest. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+<link rel="stylesheet" href="/stile.css">
+</head>
+<body>
+<a class="salta" href="#principale">Salta al contenuto</a>
+
+<main id="principale">
+  <header class="eroe">
+    <img src="/icone/icona-192.png" alt="" width="76" height="76" class="logo">
+    <h1>Prova Notifiche&nbsp;Push</h1>
+    <p class="occhiello">Banco di prova · Android e iPhone</p>
+  </header>
+
+  <!-- ═══ La carta unica: dice sempre e solo cosa succede ADESSO ═══════════
+       Prima erano tre riquadri identici e l'occhio non sapeva da dove
+       cominciare. Ora ce n'e' uno, e cambia. -->
+  <section class="carta principale" id="carta">
+    <div class="pastiglia" id="pastiglia"><span class="punto"></span><span id="pastiglia-testo">Controllo…</span></div>
+    <h2 id="carta-titolo">Un momento…</h2>
+    <p id="carta-testo">Sto controllando che cosa può fare questo dispositivo.</p>
+
+    <div class="azioni">
+      <button id="btn-attiva" type="button" class="btn primario nascosto">Attiva le notifiche</button>
+      <button id="btn-installa" type="button" class="btn primario nascosto">Installa l'app</button>
+    </div>
+
+    <p id="esito" class="esito" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- ═══ La prova: compare solo quando c'è davvero qualcosa da provare ═══ -->
+  <section class="carta nascosto" id="carta-prova">
+    <h2>Provale</h2>
+    <p class="tenue">
+      «Adesso» dimostra che il giro funziona. «Fra 10 secondi» è la prova che
+      conta: dopo il tocco chiudi l'app e blocca lo schermo.
+    </p>
+    <div class="azioni">
+      <button id="btn-prova" type="button" class="btn secondario">Adesso</button>
+      <button id="btn-prova-differita" type="button" class="btn secondario accentato">
+        Fra 10 secondi
+      </button>
+    </div>
+
+    <!-- Il conto alla rovescia: non piu' una riga di testo grigia, ma la cosa
+         che guardi mentre chiudi l'app. -->
+    <div class="conto nascosto" id="conto" role="timer" aria-live="off">
+      <svg viewBox="0 0 100 100" class="quadrante" aria-hidden="true">
+        <circle cx="50" cy="50" r="44" class="pista"/>
+        <circle cx="50" cy="50" r="44" class="arco" id="arco"/>
+      </svg>
+      <strong id="conto-numero">10</strong>
+      <p id="conto-testo">Chiudi l'app e blocca lo schermo</p>
+    </div>
+  </section>
+
+  <!-- ═══ L'arrivo: l'istante che conta, e prima passava inosservato ═══════ -->
+  <section class="carta festa nascosto" id="festa">
+    <div class="festa-segno" aria-hidden="true">
+      <svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M15 27l8 8 15-16"/></svg>
+    </div>
+    <h2>È arrivata</h2>
+    <p id="festa-testo"></p>
+    <button type="button" class="btn discreto" id="btn-ancora">Riprova</button>
+  </section>
+
+  <details class="carta spiegazione">
+    <summary>Perché su iPhone bisogna installarla</summary>
+    <p>
+      Su iOS le notifiche push funzionano <strong>solo</strong> dentro una web app
+      aggiunta alla schermata Home, da iOS 16.4 in poi. In Safari il pulsante non
+      farebbe nulla: non è un difetto di questa pagina, è come Apple ha deciso che
+      funzioni il web push.
+    </p>
+    <p>
+      Su Android funzionano anche nel browser, ma installandola arrivano con l'app
+      chiusa e l'icona resta sulla schermata Home.
+    </p>
+    <p class="tenue">
+      Nessun dato personale viene raccolto: il server conserva solo l'indirizzo
+      tecnico a cui recapitare le notifiche a questo dispositivo, e lo cancella
+      quando disattivi.
+    </p>
+  </details>
+
+  <footer class="pieddi">
+    <!-- Una scelta definitiva senza modo di tornare indietro non e' rispetto,
+         e' un vicolo cieco: chi ha spento l'invito deve poterlo riaccendere. -->
+    <button type="button" class="collegamento nascosto" id="btn-riaccendi">
+      Rivedi l'invito all'installazione
+    </button>
+    <a class="collegamento" href="/">Sito notizie</a>
+    <a class="collegamento" href="/architettura">Com'è fatto il sito</a>
+    <a class="collegamento" href="/comunicazione">Guida: app e server</a>
+    <a class="collegamento" href="/laboratorio">Verbale delle prove</a>
+  </footer>
+</main>
+
+<pwa-invito
+  nome-app="Prova Notifiche"
+  icona="/icone/icona-192.png"
+  ritardo="2200"
+  rinvio-giorni="7"></pwa-invito>
+
+<script type="module" src="/componente/pwa-invito.js"></script>
+<script src="/js/banco.js" defer></script>
+</body>
+</html>
