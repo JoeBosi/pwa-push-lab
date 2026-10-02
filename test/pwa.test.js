@@ -331,6 +331,29 @@ test('ogni classe usata da una pagina e\' definita nei fogli che quella pagina c
   }
 });
 
+test('tema chiaro e scuro: ogni coppia testo/sfondo ha almeno 4,5:1 di contrasto', () => {
+  // Il tema scuro e' stato giudicato "poco leggibile", e a ragione: il testo
+  // bianco sui pulsanti aveva 3,2:1. Qui si misura, non si giudica a occhio.
+  const css = leggi('public/stile.css');
+  const tema = (blocco) => Object.fromEntries([...blocco.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2]]));
+  const chiaro = tema(css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {'))));
+  const scuro = { ...chiaro, ...tema(css.slice(css.indexOf('prefers-color-scheme: dark'), css.indexOf('}\n}', css.indexOf('prefers-color-scheme: dark')))) };
+  const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
+    .map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const rapporto = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const coppie = [['testo', 'carta'], ['testo', 'sfondo'], ['tenue', 'carta'], ['tenue', 'sfondo'],
+    ['indaco-vivo', 'carta'], ['ok', 'carta'], ['guasto', 'carta'], ['attesa', 'carta']];
+  for (const [nome, t] of [['chiaro', chiaro], ['scuro', scuro]]) {
+    for (const [a, b] of coppie) {
+      const r = rapporto(t[a], t[b]);
+      assert.ok(r >= 4.5, `tema ${nome}: --${a} su --${b} = ${r.toFixed(2)}:1, sotto 4,5`);
+    }
+    const r = rapporto('#ffffff', t.pieno);
+    assert.ok(r >= 4.5, `tema ${nome}: testo bianco sui pulsanti (--pieno) = ${r.toFixed(2)}:1`);
+  }
+});
+
 test('i fogli di stile dichiarano color-scheme e lo stato :focus-visible', () => {
   for (const f of ['public/stile.css', 'public/architettura.css']) {
     const c = leggi(f);

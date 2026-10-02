@@ -41,7 +41,7 @@ main.largo { max-width: 46rem; }
 @media (hover: hover) {
   .segmento:hover, .filtro:hover { border-color: var(--indaco-vivo); color: var(--indaco-vivo); }
 }
-.segmento[aria-pressed="true"] { background: var(--indaco-vivo); border-color: var(--indaco-vivo); color: #fff; }
+.segmento[aria-pressed="true"] { background: var(--pieno); border-color: var(--pieno); color: #fff; }
 .segmento.spento[aria-pressed="true"] { background: var(--bordo); border-color: var(--bordo); color: var(--testo); }
 
 .prova-cat {
@@ -57,7 +57,7 @@ main.largo { max-width: 46rem; }
   font: inherit; font-size: .8rem; padding: 6px 12px; cursor: pointer;
   border: 1px solid var(--bordo); border-radius: 999px; background: transparent; color: var(--tenue);
 }
-.filtro[aria-pressed="true"] { background: var(--indaco-vivo); border-color: var(--indaco-vivo); color: #fff; }
+.filtro[aria-pressed="true"] { background: var(--pieno); border-color: var(--pieno); color: #fff; }
 
 .elenco { list-style: none; margin: 0; padding: 0; }
 .elenco li { padding: 12px 0; border-bottom: 1px solid var(--bordo); overflow-wrap: anywhere; }
@@ -109,7 +109,7 @@ main.largo { max-width: 46rem; }
 .passaggi li::before {
   content: counter(p); position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
   width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--indaco-vivo); color: #fff; font-size: .72rem; font-weight: 700;
+  background: var(--pieno); color: #fff; font-size: .72rem; font-weight: 700;
 }
 .passaggi strong { color: var(--testo); display: block; font-size: .9rem; }
 

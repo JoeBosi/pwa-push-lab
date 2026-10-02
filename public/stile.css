@@ -14,6 +14,10 @@
   --indaco: #1e3a8a;
   --indaco-vivo: #2563eb;
   --indaco-tenue: #eef3ff;
+  /* Sfondo dei pulsanti pieni (testo bianco sopra). In chiaro coincide con
+     l'accento; in scuro no: vedi sotto. */
+  --pieno: #2563eb;
+  --pieno-hover: #1e4fd0;
 
   --sfondo: #f5f7fc;
   --carta: #ffffff;
@@ -34,20 +38,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --indaco: #3b6fe0;
-    --indaco-vivo: #5b8cf5;
-    --indaco-tenue: #18213a;
+    /* Rivisto il 2026-10-02 per leggibilita', con contrasti misurati (minimo
+       4,5:1 per il testo). Prima il testo bianco sui pulsanti aveva 3,2:1.
+       L'accento e' diviso in due: uno chiaro per le scritte blu su fondo scuro
+       (--indaco-vivo, 7,9:1) e uno piu' scuro per gli sfondi con testo bianco
+       (--pieno, 5,7:1). Un solo blu non puo' superare 4,5 in entrambi i ruoli. */
+    --indaco: #1e3a8a;
+    --indaco-vivo: #8fb0ff;
+    --indaco-tenue: #1b2647;
+    --pieno: #2f5fd0;
+    --pieno-hover: #3a6be0;
 
     --sfondo: #0b1120;
     --carta: #151d31;
-    --testo: #e9edf7;
-    --tenue: #98a4c2;
-    --bordo: #26304d;
+    --testo: #eef1f8;
+    --tenue: #b3bdd6;
+    --bordo: #2c3757;
 
     --ok: #4ade80;
     --ok-tenue: #12271d;
     --attesa: #fbbf24;
-    --guasto: #f87171;
+    --guasto: #fca5a5;
 
     --ombra: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 26px -12px rgba(0, 0, 0, .6);
   }
@@ -56,6 +67,7 @@
 /* Il componente dell'invito prende i colori da qui: un tema solo per tutto. */
 pwa-invito {
   --pwa-accento: var(--indaco-vivo);
+  --pwa-accento-pieno: var(--pieno);
   --pwa-accento-scuro: var(--indaco);
   --pwa-fondo: var(--carta);
   --pwa-testo: var(--testo);
@@ -141,7 +153,7 @@ h1 {
 .btn:not(:disabled):active { transform: scale(.978); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
-.primario { background: var(--indaco-vivo); color: #fff; }
+.primario { background: var(--pieno); color: #fff; }
 .secondario { background: transparent; color: var(--indaco-vivo); border-color: var(--bordo); }
 /* Fra le due prove, quella che conta e' la differita: si vede. */
 .secondario.accentato { border-color: var(--indaco-vivo); }
@@ -149,7 +161,7 @@ h1 {
 
 /* Il passaggio del mouse si vede: un pulsante che non reagisce sembra spento. */
 @media (hover: hover) {
-  .primario:not(:disabled):hover { background: var(--indaco); }
+  .primario:not(:disabled):hover { background: var(--pieno-hover); }
   .secondario:not(:disabled):hover, .discreto:not(:disabled):hover {
     background: color-mix(in srgb, var(--indaco-vivo) 8%, transparent);
   }
@@ -234,7 +246,7 @@ h1 {
 /* Il primo tasto Tab porta qui: chi naviga da tastiera salta testata e menu. */
 .salta {
   position: absolute; left: 12px; top: -60px; z-index: 1000;
-  background: var(--indaco-vivo); color: #fff; padding: 10px 16px; border-radius: 10px;
+  background: var(--pieno); color: #fff; padding: 10px 16px; border-radius: 10px;
   font-weight: 650; text-decoration: none;
 }
 .salta:focus { top: calc(env(safe-area-inset-top) + 10px); }

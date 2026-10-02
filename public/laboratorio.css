@@ -32,7 +32,7 @@
   display: flex; flex-direction: column; gap: 2px;
 }
 /* Il numero che conta davvero: quante notifiche sono comparse su uno schermo. */
-.mattonella.evidenza { border-color: var(--primario-vivo); border-width: 2px; }
+.mattonella.evidenza { border-color: var(--pieno); border-width: 2px; }
 .mattonella .etichetta { font-size: 0.78rem; color: var(--tenue); text-transform: uppercase; letter-spacing: 0.04em; }
 .mattonella strong { font-size: 1.9rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .mattonella .dettaglio { font-size: 0.8rem; color: var(--tenue); }
@@ -52,7 +52,7 @@
   border: 1px solid var(--bordo); border-radius: 999px;
   background: transparent; color: var(--tenue);
 }
-.filtro.attivo { background: var(--primario-vivo); border-color: var(--primario-vivo); color: #fff; }
+.filtro.attivo { background: var(--pieno); border-color: var(--pieno); color: #fff; }
 
 /* --- il verbale --- */
 .verbale { list-style: none; margin: 0; padding: 0; }
@@ -71,7 +71,7 @@
 .verbale li.errore .cosa { color: var(--guasto); }
 /* Una riga appena arrivata si nota senza dover cercare dov'era il fondo. */
 .verbale li.nuova { animation: entra 1.4s ease-out; }
-@keyframes entra { from { background: color-mix(in srgb, var(--primario-vivo) 22%, transparent); } }
+@keyframes entra { from { background: color-mix(in srgb, var(--pieno) 22%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .verbale li.nuova { animation: none; } }
 
 @media (max-width: 34rem) {

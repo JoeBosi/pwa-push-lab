@@ -59,6 +59,10 @@ MODELLO.innerHTML = `
        2026-10-01): un componente da riusare non puo' scegliere nomi che una
        pagina ospite potrebbe gia' usare. */
     --i-accento: var(--pwa-accento, #2563eb);
+    /* Sfondo dei pulsanti pieni. Separato dall'accento delle scritte perche' in
+       tema scuro nessun blu e' leggibile in entrambi i ruoli: chiaro abbastanza
+       da leggersi su fondo scuro vuol dire troppo chiaro per il testo bianco. */
+    --i-accento-pieno: var(--pwa-accento-pieno, var(--i-accento));
     --i-accento-scuro: var(--pwa-accento-scuro, #1e3a8a);
     --i-su-accento: var(--pwa-su-accento, #ffffff);
     --i-fondo: var(--pwa-fondo, #ffffff);
@@ -134,10 +138,10 @@ MODELLO.innerHTML = `
   /* ── i tre passi ───────────────────────────────────────────────────────── */
   .percorso { display: flex; gap: 6px; margin: 16px 0 4px; }
   .tratto { flex: 1; height: 3px; border-radius: 2px; background: var(--i-bordo); overflow: hidden; }
-  .tratto.fatto { background: var(--i-accento); }
+  .tratto.fatto { background: var(--i-accento-pieno); }
   .tratto.ora::after {
     content: ""; display: block; height: 100%; width: 40%;
-    background: var(--i-accento); animation: scorre 1.5s ease-in-out infinite;
+    background: var(--i-accento-pieno); animation: scorre 1.5s ease-in-out infinite;
   }
   @keyframes scorre { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
   .etichetta-passo { font-size: .74rem; color: var(--i-tenue); margin: 7px 0 0; letter-spacing: .02em; }
@@ -151,7 +155,7 @@ MODELLO.innerHTML = `
   ol li::before {
     content: counter(p); flex: none;
     width: 23px; height: 23px; border-radius: 50%;
-    background: var(--i-accento); color: var(--i-su-accento);
+    background: var(--i-accento-pieno); color: var(--i-su-accento);
     font-size: .76rem; font-weight: 700;
     display: grid; place-items: center; margin-top: 1px;
   }
@@ -180,7 +184,7 @@ MODELLO.innerHTML = `
   }
   .foglio:focus { outline: none; }
   .foglio:focus-visible { outline-offset: -3px; }
-  .principale { background: var(--i-accento); color: var(--i-su-accento); }
+  .principale { background: var(--i-accento-pieno); color: var(--i-su-accento); }
   .secondario { background: transparent; color: var(--i-accento); border-color: var(--i-accento); }
   .minori { display: flex; gap: 8px; margin-top: 3px; }
   .minori button {
@@ -200,7 +204,7 @@ MODELLO.innerHTML = `
   :host([indica="basso"]) .freccia { display: block; bottom: 8px; }
   :host([indica="alto"]) .freccia { display: block; top: calc(env(safe-area-inset-top) + 8px); }
   .freccia svg { width: 40px; height: 46px; filter: drop-shadow(0 3px 9px rgba(0,0,0,.32)); }
-  .freccia path { fill: var(--i-accento); }
+  .freccia path { fill: var(--i-accento-pieno); }
   :host([indica="basso"]) .freccia { animation: giu 1.15s ease-in-out infinite; }
   :host([indica="alto"]) .freccia { animation: su 1.15s ease-in-out infinite; }
   @keyframes giu { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, 11px); } }
